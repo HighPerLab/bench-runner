@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+
+# THIS IS A TEMPLATE FILE (it will be used globally to define
+# runs for the bench-runner system).
+# BE CAREFUL WHAT YOU CHANGE HERE!
+
+# CURRENTLY WE DO NOT SUPPORT MULTI-THREADED PROGRAMS
+
+# SBATCH RELATED
+#SBATCH --exclusive
+#SBATCH --partition amd-longq
+#SBATCH --time 60
+#SBATCH --gres=gpu:k20:1
+#SBATCH --cpus-per-task 2
+#SBATCH --output /tmp/sac-bench-system.log
+#SBATCH --open-mode append
+
+# SETUP MODULES
+module purge
+module load shared
+module load gcc/4.8.5
+module load cuda90/toolkit/9.0.176
+module load hwloc/1.11.6
+module load sac/amd-dev-git
+
+# BASH SETTINGS
+shopt -s nullglob
+set -bm
+
+# SETUP SAC
+SAC2C="$(which sac2c_d)"
+WORKDIR="$(mktemp -d)"
+LOCALDIR=@PWD@
+
+# PROFILE
+# Format:
+# - BENCHSUITE = ''
+# - BENCHNAME = ''
+# - SOURCES = ()
+# - INPUT = () optional, if give all data is copied to temp
+# - TARGETS = () optional, defaults to TARGETS = ('seq')
+# - VARIENTS = () optional, defaults to VARIENTS = ('default')
+# - BUILDFLAGS = () is converted to BUILDFLAGS_default
+#   or BUILDFLAGS_varient = () 
+# - RUNFLAGS = '' optional
+# - STDINS = '' optional
+@PROFILE@
+
+# HELPER FUNCTIONS
+
+log()
+{
+    printf "[%s](${BENCHSUITE}-${BENCHNAME}): %s\n" "$(date +'%F %T %Z')" "$1" >&2 
+}
+
+state()
+{
+    echo "SAC2C    = ${SAC2C}"
+    echo "WORKDIR  = ${WORKDIR}"
+    echo "  dir structure:"
+    ls -la ${WORKDIR}
+    echo "LOCALDIR = ${PWD}"
+    if [ ! -z "${buildflags}" ]; then echo "BUILDFLAGS = ${buildflags}"; fi
+}
+
+save_logs()
+{
+    log "saving workdir logs..."
+
+    pushd "$WORKDIR"
+    logs=( *.log )
+    if [ ! -z $logs ]; then
+        log "saving ${logs[@]}"
+        tar -cf "${BENCHSUITE}-${BENCHNAME}-result.tar" "${logs[@]}"
+        mv "${WORKDIR}/${BENCHSUITE}-${BENCHNAME}-result.tar" "$LOCALDIR/"
+    else
+        log "no logs to save"
+    fi
+    popd
+}
+
+finish()
+{
+    log "Deleting workdir..."
+    rm -rf "${WORKDIR}"
+}
+
+error_handling()
+{
+    log "An error was detected, exitting..."
+    state
+    exit 1
+}
+
+handle_child()
+{
+    if [[ $? -eq 139 ]]; then
+        log "current run has segfaulted, no output could be saved"
+    fi
+}
+
+# TRAPS
+
+trap finish EXIT
+trap error_handling ERR
+trap handle_child CHLD
+
+# COMPILE BENCHMARK
+
+pushd "${WORKDIR}"
+for source in ${SOURCES[@]}; do
+    for target in ${TARGETS[@]}; do
+        for varient in ${VARIENTS[@]}; do
+            buildflags="$(eval echo "\${BUILDFLAGS_${varient//\'}}")"
+            log "compiling target '$target' varient '$varient' with \`${buildflags}'"
+            $SAC2C ${buildflags} -t $target -o "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${LOCALDIR}/${source}"
+        done
+    done
+done
+popd
+
+# HANDLE INPUT
+
+if [ "${#INPUT}" -ne 0 ]; then
+    for input in "${INPUT[@]}"; do
+        log "copying $input to workdir ${WORKDIR}"
+        cp -r "${LOCALDIR}/${input}" "${WORKDIR}/"
+    done
+fi
+
+# RUN BENCHMARK
+
+pushd "${WORKDIR}"
+for target in ${TARGETS[@]}; do
+    for varient in ${VARIENTS[@]}; do
+        log "running for target '$target' and varient '$varient'"
+        if [ -z "${STDINS}" ]; then
+            { /usr/bin/time -p -o "timerfile" -f "!!str 'elapsed': [!!float %e, !!str 's']" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"; } 2> "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.err.log"
+        else
+            { /usr/bin/time -p -o "timerfile" -f "!!str 'elapsed': [!!float %e, !!str 's']" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"; } 2> "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.err.log"
+        fi
+        cat "timerfile" >> "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
+
+        if [[ "${target}" =~ "cuda" ]]; then
+            if [ -z "${STDINS}" ]; then
+                nvprof --profile-api-trace driver --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
+            else
+                nvprof --profile-api-trace driver --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
+            fi
+        fi
+    done
+done
+popd
+
+log "done running"
+
+# SAVE LOGS
+
+save_logs

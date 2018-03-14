@@ -1,0 +1,40 @@
+This directory contains a set of scripts designed to launch
+several benchmarks using SLURM and multiple nodes.
+
+All output is write to a tmp dir and then copied over at
+the end of the runs.
+
+Expected directory structure:
+
+```
+rodinia - {bfs, hotspot, kmeans, etc.} - sac
+nas     - {EP, CG, MG, FT}
+```
+Because we are using SLURM, we can create batch scripts to
+(a) compile the source code, (b) launch it with a varienty
+of parameters, and (c) collect the output into an amenable
+format to send back to the host.
+
+Specifically, the source code is compiled and run based open
+a _profile_ which describes what flags to use and what input
+or flags to pass to the binary. The binary is intentionally
+run in `/tmp` to save on IO cost. After it has been run, the
+data is copied back in a compressed form for later viewing.
+
+
+
+
+#OLD IDEA ---->
+All code is compiled using the compile script, which ensures
+that we use the same compilation flags throughout. The binaries
+are then copied to `bin` and named using the following format:
+
+```
+%benchmark%-%suite%-%varient%.out
+```
+
+_The %varient% key indicates what SaC target was used_.
+
+All the benchmarks then can be run using the `run` script. It
+will go through `bin` and execute the files. Because we are using
+SLURM, it will in practice

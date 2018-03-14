@@ -1,0 +1,8 @@
+BENCHSUITE='testsuite'
+BENCHNAME='testbench'
+SOURCES=('')
+INPUT=() 
+TARGETS=('seq')
+VARIENTS=('default')
+BUILDFLAGS=('-wow')
+RUNFLAGS=()

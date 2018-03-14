@@ -1,0 +1,9 @@
+# logs
+*.log
+*.tar
+
+# other scripts
+*.sh
+
+# profiles
+*.profile
