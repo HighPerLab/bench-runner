@@ -14,7 +14,8 @@
 # - VARIENTS = () optional, defaults to VARIENTS = ('default')
 # - BUILDFLAGS = () is converted to BUILDFLAGS_default
 #   or BUILDFLAGS_varient = () 
-# - RUNFLAGS = ()
+# - RUNFLAGS = '' optional
+# - STDINS = '' optional
 #
 # NOTE: COMMENTS ARE NOT SUPPORTED, LINES CONTAINING key=value
 #       PAIRS
@@ -23,7 +24,10 @@ shopt -s nullglob
 
 PROFILES=( *.profile )
 
-if [ ${#PROFILES} -eq 0 ]; then exit 1; fi
+if [ ${#PROFILES[@]} -eq 0 ]; then
+    echo "No profiles found! Exiting." >&2
+    exit 1
+fi
 
 for profile in ${PROFILES[@]}; do
     declare -A CURRENTPROFILE
@@ -41,12 +45,22 @@ for profile in ${PROFILES[@]}; do
         CURRENTPROFILE[VARIENTS]="('default')"
     fi
 
-    IFS=' ()' read -r -a varients <<< ${CURRENTPROFILE[VARIENTS]}
+    IFS=',' read -r -a varients <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[VARIENTS]})"
+    IFS=',' read -r -a targets <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[TARGETS]})"
 
     # copy build flags
     for varient in ${varients[@]}; do
         if [ -z "${CURRENTPROFILE[BUILDFLAGS_${varient//\'}]}" ]; then
             CURRENTPROFILE[BUILDFLAGS_${varient//\'}]="${CURRENTPROFILE[BUILDFLAGS]}"
+        fi
+        if [ "${#targets[@]}" -gt 1 ]; then
+            IFS=',' read -r -a buildflags <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[BUILDFLAGS_${varient//\'}]})"
+            for (( i=0; i<${#targets[@]}; i++ )); do
+                if [ -z "${buildflags[${i}]}" ]; then
+                    buildflags[${i}]="${buildflags[0]}"
+                fi
+            done
+            CURRENTPROFILE[BUILDFLAGS_${varient//\'}]="$(printf "(%s)" "${buildflags[*]}")"
         fi
     done
 
