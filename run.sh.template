@@ -9,6 +9,7 @@
 # SBATCH RELATED
 #SBATCH --exclusive
 #SBATCH --partition amd-longq
+#SBATCH --job-name @NAME@
 #SBATCH --time 60
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=hans@viess.mn
@@ -53,19 +54,31 @@ LOCALDIR="@PWD@"
 
 log()
 {
-    printf "[%s](${BENCHSUITE}-${BENCHNAME}): %s\n" "$(date +'%F %T %Z')" "$1" >> "${WORKDIR}/${LOGFILE}"
+    printf "[%(%F %T %Z)T](${BENCHSUITE}-${BENCHNAME}): %s\n" "$1" >> "${WORKDIR}/${LOGFILE}"
+}
+
+log_column()
+{
+    printf "[%(%F %T %Z)T](${BENCHSUITE}-${BENCHNAME}): %-20s = %20s\n" "$1" "$2" >> "${WORKDIR}/${LOGFILE}"
+}
+
+log_dir()
+{
+    local -a content=( "${1}"/* )
+    for i in ${content[@]}; do
+        printf "[%(%F %T %Z)T](${BENCHSUITE}-${BENCHNAME}): ... %s" "$i"
+    done
 }
 
 state()
 {
-    echo "SAC2C    = ${SAC2C}"
-    echo "WORKDIR  = ${WORKDIR}"
-    echo "  dir structure:"
-    ls -la ${WORKDIR}
-    echo "LOCALDIR = ${PWD}"
-    [ -z "${target}" ] || echo "TARGET = ${varient}"
-    [ -z "${varient}" ] || echo "VARIENT = ${varient}"
-    [ -z "${buildflags}" ] || echo "BUILDFLAGS = ${buildflags}"
+    log_column "SAC2C" "${SAC2C}"
+    log_column "WORKDIR" "${WORKDIR}"
+    log_dir "${WORKDIR}"
+    log_column "LOCALDIR" "${PWD}"
+    [ -z "${target}" ] || log_column "TARGET" "${varient}"
+    [ -z "${varient}" ] || log_column "VARIENT" "${varient}"
+    [ -z "${buildflags}" ] || log_column "BUILDFLAGS" "${buildflags}"
 }
 
 save_logs()
