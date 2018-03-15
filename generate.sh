@@ -22,10 +22,30 @@
 
 shopt -s nullglob
 
-PROFILES=( *.profile )
+FORCE=1
+PROFDIR="${PWD}"
+
+while getopts "hfd:" flag; do
+    case $flag in
+        f)
+            FORCE=0
+            ;;
+        d)
+            PROFDIR="${OPTARG}"
+            ;;
+        h)
+            ;&
+        ?)
+            echo "Usage: $0 [-h|-f] [-d dir]" >&2
+            exit 0
+            ;;
+    esac
+done
+
+PROFILES=( "${PROFDIR}"/*.profile )
 
 if [ ${#PROFILES[@]} -eq 0 ]; then
-    echo "No profiles found! Exiting." >&2
+    echo "No profiles found! Exiting..." >&2
     exit 1
 fi
 
@@ -74,6 +94,11 @@ for profile in ${PROFILES[@]}; do
     done
 
     # generate sbatch script
-    sed -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:'${PWD}':" run.sh.template > "${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
-    chmod +x "${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
+    if [ -f "${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh" -a ${FORCE} -eq 0 ]; then
+        echo "Overwriting ${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
+        sed -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.template > "${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
+        chmod +x "${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
+    else
+        echo "Not updating ${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
+    fi
 done

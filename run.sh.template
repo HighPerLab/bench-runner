@@ -32,7 +32,8 @@ set -bm
 # SETUP SAC
 SAC2C="$(which sac2c_d)"
 WORKDIR="$(mktemp -d)"
-LOCALDIR=@PWD@
+LOGFILE="output.log"
+LOCALDIR="@PWD@"
 
 # PROFILE
 # Format:
@@ -52,7 +53,7 @@ LOCALDIR=@PWD@
 
 log()
 {
-    printf "[%s](${BENCHSUITE}-${BENCHNAME}): %s\n" "$(date +'%F %T %Z')" "$1" >&2 
+    printf "[%s](${BENCHSUITE}-${BENCHNAME}): %s\n" "$(date +'%F %T %Z')" "$1" >> "${WORKDIR}/${LOGFILE}"
 }
 
 state()
@@ -76,8 +77,8 @@ save_logs()
     if [ ! -z $logs ]; then
         log "saving ${logs[@]}"
         tar -cf "${BENCHSUITE}-${BENCHNAME}-result.tar" "${logs[@]}"
-        [ -d "${LOCALDIR}/results" ] || mkdir "${LOCALDIR}/results"
-        mv "${WORKDIR}/${BENCHSUITE}-${BENCHNAME}-result.tar" "${LOCALDIR}/results/"
+        [ -d "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}" ] || mkdir -p "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}"
+        mv "${WORKDIR}/${BENCHSUITE}-${BENCHNAME}-result.tar" "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}/"
     else
         log "no logs to save"
     fi
