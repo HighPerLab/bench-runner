@@ -33,6 +33,8 @@ set -bm
 # SETUP SAC
 SAC2C="$(which sac2c_d)"
 WORKDIR="$(mktemp -d)"
+STAGE="NULL"
+declare -A SKIP
 LOGFILE="output.log"
 LOCALDIR="@PWD@"
 
@@ -59,26 +61,31 @@ log()
 
 log_column()
 {
-    printf "[%s](${BENCHSUITE}-${BENCHNAME}): %-20s = %-20s\n" "$(date +'%F %T %Z')" "$1" "$2" >> "${WORKDIR}/${LOGFILE}"
+    printf "                                  %-20s = %-20s\n" "$1" "$2" >> "${WORKDIR}/${LOGFILE}"
 }
 
 log_dir()
 {
     local -a content=( "${1}"/* )
+    printf "              ..........................................................\n" "$(date +'%F %T %Z')" >> "${WORKDIR}/${LOGFILE}"
     for i in ${content[@]}; do
-        printf "[%s](${BENCHSUITE}-${BENCHNAME}): ... %s" "$(date +'%F %T %Z')" "$i" >> "${WORKDIR}/${LOGFILE}"
+        printf "                                   %s\n" "$(basename $i)" >> "${WORKDIR}/${LOGFILE}"
     done
+    printf "              ..........................................................\n" "$(date +'%F %T %Z')" >> "${WORKDIR}/${LOGFILE}"
 }
 
 state()
 {
+    printf " #################################################################################\n" >> "${WORKDIR}/${LOGFILE}"
+    log_column "STAGE" "${STAGE}"
     log_column "SAC2C" "${SAC2C}"
     log_column "WORKDIR" "${WORKDIR}"
     log_dir "${WORKDIR}"
     log_column "LOCALDIR" "${LOCALDIR}"
-    [ -z "${target}" ] || log_column "TARGET" "${varient}"
+    [ -z "${target}" ] || log_column "TARGET" "${target}"
     [ -z "${varient}" ] || log_column "VARIENT" "${varient}"
     [ -z "${buildflags}" ] || log_column "BUILDFLAGS" "${buildflags}"
+    printf " #################################################################################\n" >> "${WORKDIR}/${LOGFILE}"
 }
 
 save_logs()
@@ -90,8 +97,10 @@ save_logs()
     if [ ! -z $logs ]; then
         log "saving ${logs[@]}"
         tar -cf "${BENCHSUITE}-${BENCHNAME}-result.tar" "${logs[@]}"
+        [ $? -ne 0 ] && error_handling
         [ -d "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}" ] || mkdir -p "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}"
         mv "${WORKDIR}/${BENCHSUITE}-${BENCHNAME}-result.tar" "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}/"
+        [ $? -ne 0 ] && error_handling
     else
         log "no logs to save"
     fi
@@ -108,6 +117,10 @@ error_handling()
 {
     log "An error was detected, getting state information"
     state
+    if [ "x${STAGE}" = "xBUILD" ]; then
+        log " will skip running \`${target}-${varient}' later..."
+        SKIP["${target}-${varient}"]=1
+    fi
     log "Trying to continue..."
 }
 
@@ -122,10 +135,12 @@ handle_child()
 # TRAPS
 
 trap finish EXIT
-trap error_handling ERR
+#trap error_handling ERR
 trap handle_child CHLD
 
 # COMPILE BENCHMARK
+
+STAGE="BUILD"
 
 pushd "${WORKDIR}"
 for source in ${SOURCES[@]}; do
@@ -134,7 +149,8 @@ for source in ${SOURCES[@]}; do
         for varient in ${VARIENTS[@]}; do
             buildflags="$(eval echo "\${BUILDFLAGS_${varient}[${count}]}")"
             log "compiling target '$target' varient '$varient' with \`${buildflags}'"
-            $SAC2C ${buildflags} -t $target -o "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${LOCALDIR}/${source}"
+            $SAC2C ${buildflags} -t $target -o "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${LOCALDIR}/${source}" &> "sac2c-build-${target}-${varient}.log"
+            [ $? -ne 0 ] && error_handling
         done
         count+=1
     done
@@ -142,6 +158,8 @@ done
 popd
 
 # HANDLE INPUT
+
+STAGE="INPUT"
 
 if [ ${#INPUTS[@]} -ne 0 ]; then
     for input in "${INPUTS[@]}"; do
@@ -152,23 +170,38 @@ fi
 
 # RUN BENCHMARK
 
+TFORMAT="elapsed: %e s"
+STAGE="RUN"
+
 pushd "${WORKDIR}"
 for target in ${TARGETS[@]}; do
     for varient in ${VARIENTS[@]}; do
-        log "running for target '$target' and varient '$varient'"
-        if [ -z "${STDINS}" ]; then
-            { /usr/bin/time -p -o "timerfile" -f "!!str 'elapsed': [!!float %e, !!str 's']" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"; } 2> "${LOGFILE}"
-        else
-            { /usr/bin/time -p -o "timerfile" -f "!!str 'elapsed': [!!float %e, !!str 's']" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"; } 2> "${LOGFILE}"
+        if [ ${SKIP[${target}-${varient}]} -eq 1 ]; then
+            continue
         fi
+        if [ ! -e "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" ]; then
+            log "binary missing!"
+            state
+            log "trying to continue..."
+            continue
+        fi
+        log "RUNNING target '$target' and varient '$varient'"
+        if [ -z "${STDINS}" ]; then
+            /usr/bin/time -p -o "timerfile" -f "${TFORMAT}" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log" 2>> "${LOGFILE}"
+        else
+            /usr/bin/time -p -o "timerfile" -f "${TFORMAT}" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log" 2>> "${LOGFILE}"
+        fi
+        [ $? -lt 0 ] && error_handling # FIXME we need something more sane here
         cat "timerfile" >> "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
 
         if [[ "${target}" =~ "cuda" ]]; then
+            log "Doing CUDA run"
             if [ -z "${STDINS}" ]; then
-                nvprof --profile-api-trace driver --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > /dev/null 2> "${LOGFILE}"
+                nvprof --profile-api-trace driver --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > /dev/null 2>> "${LOGFILE}"
             else
-                nvprof --profile-api-trace driver --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > /dev/null 2> "${LOGFILE}"
+                nvprof --profile-api-trace driver --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > /dev/null 2>> "${LOGFILE}"
             fi
+            [ $? -lt 0 ] && error_handling # FIXME we need something more sane here
         fi
     done
 done
@@ -177,5 +210,7 @@ popd
 log "done running"
 
 # SAVE LOGS
+
+STAGE="SAVE"
 
 save_logs

@@ -105,4 +105,9 @@ for profile in ${PROFILES[@]}; do
     else
         echo "Not updating ${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
     fi
+
+    # clear variables
+    unset CURRENTPROFILE
+    unset targets
+    unset varients
 done
