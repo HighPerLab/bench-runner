@@ -9,7 +9,7 @@
 # SBATCH RELATED
 #SBATCH --exclusive
 #SBATCH --partition amd-longq
-#SBATCH --job-name @NAME@
+#SBATCH --job-name bench-@NAME@
 #SBATCH --time 60
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=hans@viess.mn
@@ -41,7 +41,7 @@ LOCALDIR="@PWD@"
 # - BENCHSUITE = ''
 # - BENCHNAME = ''
 # - SOURCES = ()
-# - INPUT = () optional, if give all data is copied to temp
+# - INPUTS = () optional, if give all data is copied to temp
 # - TARGETS = () optional, defaults to TARGETS = ('seq')
 # - VARIENTS = () optional, defaults to VARIENTS = ('default')
 # - BUILDFLAGS = () is converted to BUILDFLAGS_default
@@ -54,19 +54,19 @@ LOCALDIR="@PWD@"
 
 log()
 {
-    printf "[%(%F %T %Z)T](${BENCHSUITE}-${BENCHNAME}): %s\n" "$1" >> "${WORKDIR}/${LOGFILE}"
+    printf "[%s](${BENCHSUITE}-${BENCHNAME}): %s\n" "$(date +'%F %T %Z')" "$1" >> "${WORKDIR}/${LOGFILE}"
 }
 
 log_column()
 {
-    printf "[%(%F %T %Z)T](${BENCHSUITE}-${BENCHNAME}): %-20s = %20s\n" "$1" "$2" >> "${WORKDIR}/${LOGFILE}"
+    printf "[%s](${BENCHSUITE}-${BENCHNAME}): %-20s = %-20s\n" "$(date +'%F %T %Z')" "$1" "$2" >> "${WORKDIR}/${LOGFILE}"
 }
 
 log_dir()
 {
     local -a content=( "${1}"/* )
     for i in ${content[@]}; do
-        printf "[%(%F %T %Z)T](${BENCHSUITE}-${BENCHNAME}): ... %s" "$i"
+        printf "[%s](${BENCHSUITE}-${BENCHNAME}): ... %s" "$(date +'%F %T %Z')" "$i" >> "${WORKDIR}/${LOGFILE}"
     done
 }
 
@@ -75,7 +75,7 @@ state()
     log_column "SAC2C" "${SAC2C}"
     log_column "WORKDIR" "${WORKDIR}"
     log_dir "${WORKDIR}"
-    log_column "LOCALDIR" "${PWD}"
+    log_column "LOCALDIR" "${LOCALDIR}"
     [ -z "${target}" ] || log_column "TARGET" "${varient}"
     [ -z "${varient}" ] || log_column "VARIENT" "${varient}"
     [ -z "${buildflags}" ] || log_column "BUILDFLAGS" "${buildflags}"
@@ -143,8 +143,8 @@ popd
 
 # HANDLE INPUT
 
-if [ "${#INPUT}" -ne 0 ]; then
-    for input in "${INPUT[@]}"; do
+if [ ${#INPUTS[@]} -ne 0 ]; then
+    for input in "${INPUTS[@]}"; do
         log "copying $input to workdir ${WORKDIR}"
         cp -r "${LOCALDIR}/${input}" "${WORKDIR}/"
     done
@@ -157,17 +157,17 @@ for target in ${TARGETS[@]}; do
     for varient in ${VARIENTS[@]}; do
         log "running for target '$target' and varient '$varient'"
         if [ -z "${STDINS}" ]; then
-            { /usr/bin/time -p -o "timerfile" -f "!!str 'elapsed': [!!float %e, !!str 's']" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"; } 2> "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.err.log"
+            { /usr/bin/time -p -o "timerfile" -f "!!str 'elapsed': [!!float %e, !!str 's']" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"; } 2> "${LOGFILE}"
         else
-            { /usr/bin/time -p -o "timerfile" -f "!!str 'elapsed': [!!float %e, !!str 's']" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"; } 2> "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.err.log"
+            { /usr/bin/time -p -o "timerfile" -f "!!str 'elapsed': [!!float %e, !!str 's']" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"; } 2> "${LOGFILE}"
         fi
         cat "timerfile" >> "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
 
         if [[ "${target}" =~ "cuda" ]]; then
             if [ -z "${STDINS}" ]; then
-                nvprof --profile-api-trace driver --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
+                nvprof --profile-api-trace driver --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > /dev/null 2> "${LOGFILE}"
             else
-                nvprof --profile-api-trace driver --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
+                nvprof --profile-api-trace driver --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > /dev/null 2> "${LOGFILE}"
             fi
         fi
     done

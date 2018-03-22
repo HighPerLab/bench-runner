@@ -9,7 +9,7 @@
 # - BENCHSUITE = ''
 # - BENCHNAME = ''
 # - SOURCES = ()
-# - INPUT = () optional, if give all data is copied to temp
+# - INPUTS = () optional, if give all data is copied to temp
 # - TARGETS = () optional, defaults to TARGETS = ('seq')
 # - VARIENTS = () optional, defaults to VARIENTS = ('default')
 # - BUILDFLAGS = () is converted to BUILDFLAGS_default
