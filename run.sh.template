@@ -61,7 +61,7 @@ log()
 
 log_column()
 {
-    printf "                                  %-20s = %-20s\n" "$1" "$2" >> "${WORKDIR}/${LOGFILE}"
+    printf "          %-20s = %-20s\n" "$1" "$2" >> "${WORKDIR}/${LOGFILE}"
 }
 
 log_dir()
@@ -69,7 +69,7 @@ log_dir()
     local -a content=( "${1}"/* )
     printf "              ..........................................................\n" "$(date +'%F %T %Z')" >> "${WORKDIR}/${LOGFILE}"
     for i in ${content[@]}; do
-        printf "                                   %s\n" "$(basename $i)" >> "${WORKDIR}/${LOGFILE}"
+        printf "              %s\n" "$(basename $i)" >> "${WORKDIR}/${LOGFILE}"
     done
     printf "              ..........................................................\n" "$(date +'%F %T %Z')" >> "${WORKDIR}/${LOGFILE}"
 }
@@ -197,9 +197,9 @@ for target in ${TARGETS[@]}; do
         if [[ "${target}" =~ "cuda" ]]; then
             log "Doing CUDA run"
             if [ -z "${STDINS}" ]; then
-                nvprof --profile-api-trace driver --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > /dev/null 2>> "${LOGFILE}"
+                nvprof --profile-api-trace all --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > /dev/null 2>> "${LOGFILE}"
             else
-                nvprof --profile-api-trace driver --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > /dev/null 2>> "${LOGFILE}"
+                nvprof --profile-api-trace all --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > /dev/null 2>> "${LOGFILE}"
             fi
             [ $? -lt 0 ] && error_handling # FIXME we need something more sane here
         fi
