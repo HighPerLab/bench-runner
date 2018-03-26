@@ -138,6 +138,30 @@ trap finish EXIT
 #trap error_handling ERR
 trap handle_child CHLD
 
+# GET SYSTEM INFO
+
+# Printout as much information as is good :-)
+cat > "${LOGFILE}" <<HERE
+## System information:
+  Date: $(date)
+    OS: $(lsb_release -s -d)
+ Linux: $(uname -a)
+   GCC: $(gcc -dumpversion)
+  NVCC: $(nvcc --version | tail -n1)
+
+   CPU:
+    model - $(grep -m 1 "model name" /proc/cpuinfo |cut -d' ' -f 4-)
+      mhz - $(grep -m 1 "cpu MHz" /proc/cpuinfo |cut -d' ' -f 3-)
+
+   GPU:
+$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader)
+
+   Mem:
+     free - $(grep MemFree /proc/meminfo | cut -d' ' -f 2-)
+    total - $(grep MemTotal /proc/meminfo | cut -d' ' -f 2-)   
+##
+HERE
+
 # COMPILE BENCHMARK
 
 STAGE="BUILD"
