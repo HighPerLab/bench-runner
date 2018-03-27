@@ -8,6 +8,7 @@
 # Format:
 # - BENCHSUITE = ''
 # - BENCHNAME = ''
+# - MODE=AUTO optional, choices: AUTO, MANUAL; default is AUTO
 # - SOURCES = ()
 # - INPUTS = () optional, if give all data is copied to temp
 # - TARGETS = () optional, defaults to TARGETS = ('seq')
@@ -22,16 +23,20 @@
 
 shopt -s nullglob
 
-FORCE=1
+FORCE=false
+VERBOSE=false
 PROFDIR="${PWD}"
 
-while getopts "hfd:" flag; do
+while getopts "vhfd:" flag; do
     case $flag in
         f)
-            FORCE=0
+            FORCE=true
             ;;
         d)
             PROFDIR="${OPTARG}"
+            ;;
+        v)
+            VERBOSE=true
             ;;
         h)
             ;&
@@ -42,6 +47,12 @@ while getopts "hfd:" flag; do
     esac
 done
 
+verbose() {
+    if [ "$VERBOSE" = true ]; then
+        echo "$1" >&2
+    fi
+}
+
 PROFILES=( "${PROFDIR}"/*.profile )
 
 if [ ${#PROFILES[@]} -eq 0 ]; then
@@ -51,63 +62,119 @@ fi
 
 for profile in ${PROFILES[@]}; do
     declare -A CURRENTPROFILE
-    while IFS== read -r key value; do
+    while IFS== read key value; do
         CURRENTPROFILE[$key]=$value
-    done < "$profile"
+        verbose "  [$key] = $value" >&2
+    done < <(sed -e 's/\(^#.*\|[^\\]#.*\)//' -e 's/\\$/\\\\n\\/' -e '/^\s*$/d' "$profile")
+    # remove handle comments (we can still
+    # escape (\#) hash symbol)
 
-    # set default target
-    if [ -z "${CURRENTPROFILE[TARGETS]}" ]; then
-        CURRENTPROFILE[TARGETS]="('seq')"
+    # build related
+    BUILD_MANUAL=false
+    skip=false
+    FULL_NAME="${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}"
+    SCRIPT_NAME="${FULL_NAME}.sh"
+
+    # get build mode
+    if [ "x${CURRENTPROFILE[MODE]//\'}" = "xMANUAL" ]; then
+        BUILD_MANUAL=true
+        CURRENTPROFILE[MODE]="'MANUAL'"
+    else
+        CURRENTPROFILE[MODE]="'AUTO'"
     fi
 
-    # set default varient
-    if [ -z "${CURRENTPROFILE[VARIENTS]}" ]; then
-        CURRENTPROFILE[VARIENTS]="('default')"
+    # check that we have build for MANUAL mode
+    if [ -z "${CURRENTPROFILE[BUILD]}" -a "$BUILD_MANUAL" = true ]; then
+        echo "Can't generate script with manual build without \`BUILD' function" >&2
+        echo "  Skipping '${SCRIPT_NAME}'" >&2
+        skip=true
+    elif [ ! -z "${CURRENTPROFILE[BUILD]}" -a "$BUILD_MANUAL" = false ]; then
+        echo "Warning: profile specifies BUILD but is in AUTO mode!"
+        unset 'CURRENTPROFILE[BUILD]'
+    fi
+    
+    # check that we have run for MANUAL mode
+    if [ -z "${CURRENTPROFILE[RUN]}" -a "$BUILD_MANUAL" = true ]; then
+        echo "Can't generate script with manual build without \`RUN' function" >&2
+        echo "  Skipping '${SCRIPT_NAME}'" >&2
+        skip=true
+    elif [ ! -z "${CURRENTPROFILE[RUN]}" -a "$BUILD_MANUAL" = false ]; then
+        echo "Warning: profile specifies RUN but is in AUTO mode!"
+        unset 'CURRENTPROFILE[RUN]'
     fi
 
-    IFS=',' read -r -a varients <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[VARIENTS]})"
-    IFS=',' read -r -a targets <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[TARGETS]})"
+    if [ "$skip" = false ]; then
+        if [ "${BUILD_MANUAL}" = true ]; then
+            # we unset most key-value pairs
+            IFS=',' read -r -a varients <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[VARIENTS]})"
+            for varient in ${varients[@]}; do
+                unset "CURRENTPROFILE[BUILDFLAGS_${varient//\'}]"
+            done
+            unset 'CURRENTPROFILE[TARGETS]'
+            unset 'CURRENTPROFILE[VARIENTS]'
+        else
+            # set default target
+            if [ -z "${CURRENTPROFILE[TARGETS]}" ]; then
+                CURRENTPROFILE[TARGETS]="('seq')"
+            fi
 
-    # copy build flags
-    for varient in ${varients[@]}; do
-        if [ -z "${CURRENTPROFILE[BUILDFLAGS_${varient//\'}]}" ]; then
-            CURRENTPROFILE[BUILDFLAGS_${varient//\'}]="${CURRENTPROFILE[BUILDFLAGS]}"
-        fi
-        if [ "${#targets[@]}" -gt 1 ]; then
-            IFS=',' read -r -a buildflags <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[BUILDFLAGS_${varient//\'}]})"
-            for (( i=0; i<${#targets[@]}; i++ )); do
-                if [ -z "${buildflags[${i}]}" ]; then
-                    buildflags[${i}]="${buildflags[0]}"
+            # set default varient
+            if [ -z "${CURRENTPROFILE[VARIENTS]}" ]; then
+                CURRENTPROFILE[VARIENTS]="('default')"
+            fi
+
+            IFS=',' read -r -a varients <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[VARIENTS]})"
+            IFS=',' read -r -a targets <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[TARGETS]})"
+
+            # copy build flags
+            for varient in ${varients[@]}; do
+                if [ -z "${CURRENTPROFILE[BUILDFLAGS_${varient//\'}]}" ]; then
+                    CURRENTPROFILE[BUILDFLAGS_${varient//\'}]="${CURRENTPROFILE[BUILDFLAGS]}"
+                fi
+                if [ "${#targets[@]}" -gt 1 ]; then
+                    IFS=',' read -r -a buildflags <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[BUILDFLAGS_${varient//\'}]})"
+                    for (( i=0; i<${#targets[@]}; i++ )); do
+                        if [ -z "${buildflags[${i}]}" ]; then
+                            buildflags[${i}]="${buildflags[0]}"
+                        fi
+                    done
+                    CURRENTPROFILE[BUILDFLAGS_${varient//\'}]="$(printf "(%s)" "${buildflags[*]}")"
                 fi
             done
-            CURRENTPROFILE[BUILDFLAGS_${varient//\'}]="$(printf "(%s)" "${buildflags[*]}")"
+
+            # remove default buildflag
+            unset 'CURRENTPROFILE[BUILDFLAGS]'
         fi
-    done
 
-    # remove default buildflag
-    unset 'CURRENTPROFILE[BUILDFLAGS]'
+        PROFILEOUT=""
 
-    PROFILEOUT=""
+        for key in ${!CURRENTPROFILE[@]}; do
+            if [ "x$key" = "xBUILD" -o "x$key" = "xRUN" ]; then
+                # output function and body
+                PROFILEOUT+=$(printf "%s(){%s}\\\\n" "${key,,}" "${CURRENTPROFILE[$key]//\'}")
+            else
+                # output key-value pair as is
+                PROFILEOUT+=$(printf "%s=%s\\\\n" "$key" "${CURRENTPROFILE[$key]}")
+            fi
+        done
 
-    for key in ${!CURRENTPROFILE[@]}; do
-        PROFILEOUT+=$(printf "%s=%s\\\\n" "$key" "${CURRENTPROFILE[$key]}")
-    done
-
-    # generate sbatch script
-    if [ -f "${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh" -a ${FORCE} -eq 0 ]; then
-        echo "Overwriting ${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
-        sed -e "s:@NAME@:${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.template > "${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
-        chmod +x "${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
-    elif [ ! -f "${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh" ]; then
-        echo "Generating ${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
-        sed -e "s:@NAME@:${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.template > "${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
-        chmod +x "${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
-    else
-        echo "Not updating ${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}.sh"
+        # generate sbatch script
+        if [ -f "${SCRIPT_NAME}" -a "${FORCE}" = true ]; then
+            echo "Overwriting ${SCRIPT_NAME}"
+            sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.template > "${SCRIPT_NAME}"
+            chmod +x "${SCRIPT_NAME}"
+        elif [ ! -f "${SCRIPT_NAME}" ]; then
+            echo "Generating ${SCRIPT_NAME}"
+            sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.template > "${SCRIPT_NAME}"
+            chmod +x "${SCRIPT_NAME}"
+        else
+            echo "Not updating ${SCRIPT_NAME}"
+        fi
     fi
 
     # clear variables
     unset CURRENTPROFILE
     unset targets
     unset varients
+    unset buildflags
 done

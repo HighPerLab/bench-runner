@@ -39,17 +39,6 @@ LOGFILE="output.log"
 LOCALDIR="@PWD@"
 
 # PROFILE
-# Format:
-# - BENCHSUITE = ''
-# - BENCHNAME = ''
-# - SOURCES = ()
-# - INPUTS = () optional, if give all data is copied to temp
-# - TARGETS = () optional, defaults to TARGETS = ('seq')
-# - VARIENTS = () optional, defaults to VARIENTS = ('default')
-# - BUILDFLAGS = () is converted to BUILDFLAGS_default
-#   or BUILDFLAGS_varient = () 
-# - RUNFLAGS = '' optional
-# - STDINS = '' optional
 @PROFILE@
 
 # HELPER FUNCTIONS

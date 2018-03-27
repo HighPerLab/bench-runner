@@ -1,8 +1,34 @@
-BENCHSUITE='testsuite'
-BENCHNAME='testbench'
-SOURCES=('')
-INPUT=() 
-TARGETS=('seq')
-VARIENTS=('default')
-BUILDFLAGS=('-wow')
-RUNFLAGS=()
+# This is a basic profile file which describes how to build/run
+# a benchmark
+
+# It is made up of KEY='value' pairs and comments.
+# Comments are given by the hash (#) symbol which you can override
+# with \# if you need to.
+
+# Any key can be added here and it will appear in the generated
+# script file. The following keys though have special meanings and
+# are treated differently from any other key:
+
+BENCHSUITE=''
+BENCHNAME=''
+MODE=           # optional, choices: AUTO, MANUAL; default is AUTO
+SOURCES=()
+INPUTS=()       # optional, if give all data is copied to temp
+TARGETS=()      # optional, defaults to TARGETS = ('seq')
+VARIENTS=()     # optional, defaults to VARIENTS = ('default')
+BUILDFLAGS=()   # is converted to BUILDFLAGS_default
+                #  or BUILDFLAGS_varient = () 
+RUNFLAGS=''     # optional
+STDINS=''       # optional
+
+# when we build with MANUAL we *must* define BUILD and RUN
+# functions (in AUTO these are ignored and not placed into
+# the sbatch script). These keys-values represent the body of
+# generated functions `build' and `run'. Newlines are given by
+# the backslash '\'.
+
+BUILD='\
+this is a line;\
+this to'
+RUN='\
+wow bang boom'
