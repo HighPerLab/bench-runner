@@ -129,6 +129,8 @@ trap handle_child CHLD
 
 # GET SYSTEM INFO
 
+STAGE='INFO'
+
 # Printout as much information as is good :-)
 cat > "${LOGFILE}" <<HERE
 ## System information:
@@ -156,18 +158,28 @@ HERE
 STAGE="BUILD"
 
 pushd "${WORKDIR}"
-for source in ${SOURCES[@]}; do
-    count=0
-    for target in ${TARGETS[@]}; do
-        for varient in ${VARIENTS[@]}; do
-            buildflags="$(eval echo "\${BUILDFLAGS_${varient}[${count}]}")"
-            log "compiling target '$target' varient '$varient' with \`${buildflags}'"
-            $SAC2C ${buildflags} -t $target -o "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${LOCALDIR}/${source}" &> "sac2c-build-${target}-${varient}.log"
-            [ $? -ne 0 ] && error_handling
-        done
-        count+=1
+
+if [ "x${MODE}" = "xMANUAL" ]; then
+    for source in ${SOURCES[@]}; do
+        cp -r "${LOCALDIR}/${source}" .
     done
-done
+
+    # call build function
+    build &>> "${LOGFILE}"
+else
+    for source in ${SOURCES[@]}; do
+        count=0
+        for target in ${TARGETS[@]}; do
+            for varient in ${VARIENTS[@]}; do
+                buildflags="$(eval echo "\${BUILDFLAGS_${varient}[${count}]}")"
+                log "compiling target '$target' varient '$varient' with \`${buildflags}'"
+                $SAC2C ${buildflags} -t $target -o "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${LOCALDIR}/${source}" &> "sac2c-build-${target}-${varient}.log"
+                [ $? -ne 0 ] && error_handling
+            done
+            count+=1
+        done
+    done
+fi
 popd
 
 # HANDLE INPUT
@@ -187,37 +199,43 @@ TFORMAT="elapsed: %e s"
 STAGE="RUN"
 
 pushd "${WORKDIR}"
-for target in ${TARGETS[@]}; do
-    for varient in ${VARIENTS[@]}; do
-        if [ ${SKIP[${target}-${varient}]} -eq 1 ]; then
-            continue
-        fi
-        if [ ! -e "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" ]; then
-            log "binary missing!"
-            state
-            log "trying to continue..."
-            continue
-        fi
-        log "RUNNING target '$target' and varient '$varient'"
-        if [ -z "${STDINS}" ]; then
-            /usr/bin/time -p -o "timerfile" -f "${TFORMAT}" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log" 2>> "${LOGFILE}"
-        else
-            /usr/bin/time -p -o "timerfile" -f "${TFORMAT}" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log" 2>> "${LOGFILE}"
-        fi
-        [ $? -lt 0 ] && error_handling # FIXME we need something more sane here
-        cat "timerfile" >> "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
 
-        if [[ "${target}" =~ "cuda" ]]; then
-            log "Doing CUDA run"
+if [ "x${MODE}" = "xMANUAL" ]; then
+    # call run function
+    run &>> "${LOGFILE}"
+else
+    for target in ${TARGETS[@]}; do
+        for varient in ${VARIENTS[@]}; do
+            if [ ${SKIP[${target}-${varient}]} -eq 1 ]; then
+                continue
+            fi
+            if [ ! -e "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" ]; then
+                log "binary missing!"
+                state
+                log "trying to continue..."
+                continue
+            fi
+            log "RUNNING target '$target' and varient '$varient'"
             if [ -z "${STDINS}" ]; then
-                nvprof --profile-api-trace all --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > /dev/null 2>> "${LOGFILE}"
+                /usr/bin/time -p -o "timerfile" -f "${TFORMAT}" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log" 2>> "${LOGFILE}"
             else
-                nvprof --profile-api-trace all --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > /dev/null 2>> "${LOGFILE}"
+                /usr/bin/time -p -o "timerfile" -f "${TFORMAT}" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log" 2>> "${LOGFILE}"
             fi
             [ $? -lt 0 ] && error_handling # FIXME we need something more sane here
-        fi
+            cat "timerfile" >> "${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
+
+            if [[ "${target}" =~ "cuda" ]]; then
+                log "Doing CUDA run"
+                if [ -z "${STDINS}" ]; then
+                    nvprof --profile-api-trace all --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" > /dev/null 2>> "${LOGFILE}"
+                else
+                    nvprof --profile-api-trace all --unified-memory-profiling per-process-device -u ms --csv --log-file "nvprof-${target}-${varient}.csv.log" ./"${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out" "${RUNFLAGS}" < "${STDINS}" > /dev/null 2>> "${LOGFILE}"
+                fi
+                [ $? -lt 0 ] && error_handling # FIXME we need something more sane here
+            fi
+        done
     done
-done
+fi
 popd
 
 log "done running"
