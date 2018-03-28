@@ -8,18 +8,16 @@
 # Format:
 # - BENCHSUITE = ''
 # - BENCHNAME = ''
-# - MODE=AUTO optional, choices: AUTO, MANUAL; default is AUTO
+# - MODE=AUTO          optional, choices: AUTO, MANUAL; default is AUTO
+# - TIMELIMIT=MINUTES  optional, defaults to 60 minutes
 # - SOURCES = ()
-# - INPUTS = () optional, if give all data is copied to temp
-# - TARGETS = () optional, defaults to TARGETS = ('seq')
-# - VARIENTS = () optional, defaults to VARIENTS = ('default')
-# - BUILDFLAGS = () is converted to BUILDFLAGS_default
-#   or BUILDFLAGS_varient = () 
-# - RUNFLAGS = '' optional
-# - STDINS = '' optional
-#
-# NOTE: COMMENTS ARE NOT SUPPORTED, LINES CONTAINING key=value
-#       PAIRS
+# - INPUTS = ()        optional, if give all data is copied to temp
+# - TARGETS = ()       optional, defaults to TARGETS = ('seq')
+# - VARIENTS = ()      optional, defaults to VARIENTS = ('default')
+# - BUILDFLAGS = ()    is converted to BUILDFLAGS_default
+#     or BUILDFLAGS_varient = ()
+# - RUNFLAGS = ''      optional
+# - STDINS = ''        optional
 
 shopt -s nullglob
 
@@ -69,11 +67,16 @@ for profile in ${PROFILES[@]}; do
     # remove handle comments (we can still
     # escape (\#) hash symbol)
 
-    # build related
     BUILD_MANUAL=false
     skip=false
     FULL_NAME="${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}"
     SCRIPT_NAME="${FULL_NAME}.sh"
+    TIMELIMIT="60"
+
+    # get time limit
+    if [ ! -z "${CURRENTPROFILE[TIMELIMIT]}" ]; then
+        TIMELIMIT="${CURRENTPROFILE[TIMELIMIT]//\'}"
+    fi
 
     # get build mode
     if [ "x${CURRENTPROFILE[MODE]//\'}" = "xMANUAL" ]; then
@@ -161,11 +164,11 @@ for profile in ${PROFILES[@]}; do
         # generate sbatch script
         if [ -f "${SCRIPT_NAME}" -a "${FORCE}" = true ]; then
             echo "Overwriting ${SCRIPT_NAME}"
-            sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.template > "${SCRIPT_NAME}"
+            sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@TIMELIMIT@:${TIMELIMIT}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.template > "${SCRIPT_NAME}"
             chmod +x "${SCRIPT_NAME}"
         elif [ ! -f "${SCRIPT_NAME}" ]; then
             echo "Generating ${SCRIPT_NAME}"
-            sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.template > "${SCRIPT_NAME}"
+            sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@TIMELIMIT@:${TIMELIMIT}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.template > "${SCRIPT_NAME}"
             chmod +x "${SCRIPT_NAME}"
         else
             echo "Not updating ${SCRIPT_NAME}"

@@ -10,13 +10,11 @@
 #SBATCH --exclusive
 #SBATCH --partition amd-longq
 #SBATCH --job-name bench-@NAME@
-#SBATCH --time 60
+#SBATCH --time @TIMELIMIT@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=hans@viess.mn
 #SBATCH --gres=gpu:k20:1
 #SBATCH --cpus-per-task 2
-#SBATCH --output /tmp/sac-bench-system.log
-#SBATCH --open-mode append
 
 # SETUP MODULES
 module purge
@@ -127,6 +125,9 @@ trap finish EXIT
 #trap error_handling ERR
 trap handle_child CHLD
 
+# we move to the workdir
+pushd "${WORKDIR}"
+
 # GET SYSTEM INFO
 
 STAGE='INFO'
@@ -157,11 +158,9 @@ HERE
 
 STAGE="BUILD"
 
-pushd "${WORKDIR}"
-
 if [ "x${MODE}" = "xMANUAL" ]; then
     for source in ${SOURCES[@]}; do
-        cp -r "${LOCALDIR}/${source}" .
+        cp -r "${LOCALDIR}/${source}" "${WORKDIR}/"
     done
 
     # call build function
@@ -180,7 +179,6 @@ else
         done
     done
 fi
-popd
 
 # HANDLE INPUT
 
@@ -197,8 +195,6 @@ fi
 
 TFORMAT="elapsed: %e s"
 STAGE="RUN"
-
-pushd "${WORKDIR}"
 
 if [ "x${MODE}" = "xMANUAL" ]; then
     # call run function
@@ -236,6 +232,8 @@ else
         done
     done
 fi
+
+# we leave the workdir
 popd
 
 log "done running"
@@ -245,3 +243,4 @@ log "done running"
 STAGE="SAVE"
 
 save_logs
+
