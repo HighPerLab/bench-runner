@@ -70,7 +70,7 @@ for profile in ${PROFILES[@]}; do
     BUILD_MANUAL=false
     skip=false
     FULL_NAME="${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}"
-    SCRIPT_NAME="${FULL_NAME}.sh"
+    SCRIPT_NAME="${FULL_NAME}.run.sh"
     TIMELIMIT="60"
 
     # get time limit
