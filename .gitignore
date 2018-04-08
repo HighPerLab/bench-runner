@@ -7,3 +7,6 @@
 
 # profiles
 *.profile
+
+# slurm files
+slurm-*.out
