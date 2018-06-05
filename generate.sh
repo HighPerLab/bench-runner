@@ -63,9 +63,9 @@ for profile in ${PROFILES[@]}; do
     while IFS== read key value; do
         CURRENTPROFILE[$key]=$value
         verbose "  [$key] = $value" >&2
-    done < <(sed -e 's/\(^#.*\|[^\\]#.*\)//' -e 's/\\$/\\\\n\\/' -e '/^\s*$/d' "$profile")
+    done < <(sed -e 's/\(^#.*\|[^\\]#.*\)//' -e 's/\&/\\\\&/g' -e 's/\\$/\\\\n\\/' -e '/^\s*$/d' "$profile")
     # remove handle comments (we can still
-    # escape (\#) hash symbol)
+    # escape (\#) hash symbol) and ampersand
 
     BUILD_MANUAL=false
     skip=false

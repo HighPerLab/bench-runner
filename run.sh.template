@@ -14,7 +14,6 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=hans@viess.mn
 #SBATCH --gres=gpu:k20:1
-#SBATCH --cpus-per-task 2
 
 # SETUP MODULES
 module purge
@@ -96,6 +95,8 @@ save_logs()
 
 finish()
 {
+    log "Removing NVPROF tmp dir, if it exists"
+    test -d /tmp/.nvprof && rm -rf /tmp/.nvprof
     log "Deleting workdir..."
     rm -rf "${WORKDIR}"
 }
