@@ -8,7 +8,8 @@
 
 # SBATCH RELATED
 #SBATCH --exclusive
-#SBATCH --partition amd-longq
+#SBATCH --partition specialq
+#SBATCH --exclude gpu01
 #SBATCH --job-name bench-@NAME@
 #SBATCH --time @TIMELIMIT@
 #SBATCH --mail-type=FAIL
