@@ -49,5 +49,10 @@ External Resources
 For system information I use the [ixni][10] tool, as it provides a
 rich amount of detail concisely.
 
+The default template makes use of [environment-module][11] to expose
+some of the underlying binaries that are used. If your system/cluster
+does not use this, don't forget to remove/edit them.
+
 [1]: https://www.macs.hw.ac.uk/gitlab/hans/benchmark-profiles
 [10]: https://github.com/smxi/inxi
+[11]: http://modules.sourceforge.net/

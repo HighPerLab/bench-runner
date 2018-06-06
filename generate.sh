@@ -9,6 +9,7 @@
 # - BENCHSUITE = ''
 # - BENCHNAME = ''
 # - MODE=AUTO          optional, choices: AUTO, MANUAL; default is AUTO
+# - COMPILER=''        set teh compiler to be used
 # - TIMELIMIT=MINUTES  optional, defaults to 60 minutes
 # - SOURCES = ()
 # - INPUTS = ()        optional, if give all data is copied to temp
@@ -22,10 +23,14 @@
 shopt -s nullglob
 
 FORCE=false
-VERBOSE=false
 PROFDIR="${PWD}"
 
-while getopts "vhfd:" flag; do
+# get external functions
+source modules/logging.bash
+source modules/sysinfo.bash
+source modules/misc.bash
+
+while getopts "vhfid:" flag; do
     case $flag in
         f)
             FORCE=true
@@ -33,39 +38,38 @@ while getopts "vhfd:" flag; do
         d)
             PROFDIR="${OPTARG}"
             ;;
-        v)
-            VERBOSE=true
+        v)  # defaults to level 3 (warn)
+            (( VERBOSITY += 1 ))
+            ;;
+        i)
+            sysinfo
+            arraylog "This is a=test to see if it works" "what"
+            exit 0
             ;;
         h)
             ;&
         ?)
-            echo "Usage: $0 [-h|-f] [-d dir]" >&2
+            echo "Usage: $0 [-h|-f|-v...] [-d dir]" >&2
             exit 0
             ;;
     esac
 done
 
-verbose() {
-    if [ "$VERBOSE" = true ]; then
-        echo "$1" >&2
-    fi
-}
-
 PROFILES=( "${PROFDIR}"/*.profile )
 
 if [ ${#PROFILES[@]} -eq 0 ]; then
-    echo "No profiles found! Exiting..." >&2
+    critical "No profiles found! Exiting..."
     exit 1
 fi
 
-for profile in ${PROFILES[@]}; do
+for profile in "${PROFILES[@]}"; do
     declare -A CURRENTPROFILE
-    while IFS== read key value; do
+    while IFS='=' read key value; do
         CURRENTPROFILE[$key]=$value
-        verbose "  [$key] = $value" >&2
+        debug "[$key] = $value"
     done < <(sed -e 's/\(^#.*\|[^\\]#.*\)//' -e 's/\&/\\\\&/g' -e 's/\\$/\\\\n\\/' -e '/^\s*$/d' "$profile")
     # remove handle comments (we can still
-    # escape (\#) hash symbol) and ampersand
+    # escape (\#) hash symbol and ampersand)
 
     BUILD_MANUAL=false
     skip=false
@@ -86,31 +90,35 @@ for profile in ${PROFILES[@]}; do
         CURRENTPROFILE[MODE]="'AUTO'"
     fi
 
-    # check that we have build for MANUAL mode
-    if [ -z "${CURRENTPROFILE[BUILD]}" -a "$BUILD_MANUAL" = true ]; then
-        echo "Can't generate script with manual build without \`BUILD' function" >&2
-        echo "  Skipping '${SCRIPT_NAME}'" >&2
+    # check that we have the compiler set
+    if [ -z "${CURRENTPROFILE[COMPILER]}" ]; then
+        error "Can't generate script without \`COMPILER' being defined. Skipping '${SCRIPT_NAME}'"
         skip=true
-    elif [ ! -z "${CURRENTPROFILE[BUILD]}" -a "$BUILD_MANUAL" = false ]; then
-        echo "Warning: profile specifies BUILD but is in AUTO mode!"
+    fi
+
+    # check that we have build for MANUAL mode
+    if [ -z "${CURRENTPROFILE[BUILD]}" ] && [ "$BUILD_MANUAL" = true ]; then
+        error "Can't generate script with manual build without \`BUILD' function. Skipping '${SCRIPT_NAME}'"
+        skip=true
+    elif [ ! -z "${CURRENTPROFILE[BUILD]}" ] && [ "$BUILD_MANUAL" = false ]; then
+        warn "Profile specifies BUILD but is in AUTO mode!"
         unset 'CURRENTPROFILE[BUILD]'
     fi
-    
+
     # check that we have run for MANUAL mode
-    if [ -z "${CURRENTPROFILE[RUN]}" -a "$BUILD_MANUAL" = true ]; then
-        echo "Can't generate script with manual build without \`RUN' function" >&2
-        echo "  Skipping '${SCRIPT_NAME}'" >&2
+    if [ -z "${CURRENTPROFILE[RUN]}" ] && [ "$BUILD_MANUAL" = true ]; then
+        error "Can't generate script with manual build without \`RUN' function. Skipping '${SCRIPT_NAME}'"
         skip=true
-    elif [ ! -z "${CURRENTPROFILE[RUN]}" -a "$BUILD_MANUAL" = false ]; then
-        echo "Warning: profile specifies RUN but is in AUTO mode!"
+    elif [ ! -z "${CURRENTPROFILE[RUN]}" ] && [ "$BUILD_MANUAL" = false ]; then
+        warn "Profile specifies RUN but is in AUTO mode!"
         unset 'CURRENTPROFILE[RUN]'
     fi
 
     if [ "$skip" = false ]; then
         if [ "${BUILD_MANUAL}" = true ]; then
             # we unset most key-value pairs
-            IFS=',' read -r -a varients <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[VARIENTS]})"
-            for varient in ${varients[@]}; do
+            IFS=',' read -r -a varients <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< "${CURRENTPROFILE[VARIENTS]}")"
+            for varient in "${varients[@]}"; do
                 unset "CURRENTPROFILE[BUILDFLAGS_${varient//\'}]"
             done
             unset 'CURRENTPROFILE[TARGETS]'
@@ -130,7 +138,7 @@ for profile in ${PROFILES[@]}; do
             IFS=',' read -r -a targets <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[TARGETS]})"
 
             # copy build flags
-            for varient in ${varients[@]}; do
+            for varient in "${varients[@]}"; do
                 if [ -z "${CURRENTPROFILE[BUILDFLAGS_${varient//\'}]}" ]; then
                     CURRENTPROFILE[BUILDFLAGS_${varient//\'}]="${CURRENTPROFILE[BUILDFLAGS]}"
                 fi
@@ -151,8 +159,8 @@ for profile in ${PROFILES[@]}; do
 
         PROFILEOUT=""
 
-        for key in ${!CURRENTPROFILE[@]}; do
-            if [ "x$key" = "xBUILD" -o "x$key" = "xRUN" ]; then
+        for key in "${!CURRENTPROFILE[@]}"; do
+            if [ "x$key" = "xBUILD" ] || [ "x$key" = "xRUN" ]; then
                 # output function and body
                 PROFILEOUT+=$(printf "%s(){%s}\\\\n" "${key,,}" "${CURRENTPROFILE[$key]//\'}")
             else
@@ -162,21 +170,17 @@ for profile in ${PROFILES[@]}; do
         done
 
         # generate sbatch script
-        if [ -f "${SCRIPT_NAME}" -a "${FORCE}" = true ]; then
-            echo "Overwriting ${SCRIPT_NAME}"
+        if [ ! -f "${SCRIPT_NAME}" ] || [ "${FORCE}" = true ]; then
             sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@TIMELIMIT@:${TIMELIMIT}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.template > "${SCRIPT_NAME}"
-            chmod +x "${SCRIPT_NAME}"
-        elif [ ! -f "${SCRIPT_NAME}" ]; then
-            echo "Generating ${SCRIPT_NAME}"
-            sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@TIMELIMIT@:${TIMELIMIT}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.template > "${SCRIPT_NAME}"
-            chmod +x "${SCRIPT_NAME}"
+            chmod +x -- "${SCRIPT_NAME}"
         else
-            echo "Not updating ${SCRIPT_NAME}"
+            inf "Not updating ${SCRIPT_NAME}"
         fi
     fi
 
     # clear variables
     unset CURRENTPROFILE
+    unset PROFILEOUT
     unset targets
     unset varients
     unset buildflags

@@ -9,17 +9,19 @@
 # script file. The following keys though have special meanings and
 # are treated differently from any other key:
 
-BENCHSUITE=''
-BENCHNAME=''
-MODE=           # optional, choices: AUTO, MANUAL; default is AUTO
-SOURCES=()
-INPUTS=()       # optional, if give all data is copied to temp
-TARGETS=()      # optional, defaults to TARGETS = ('seq')
-VARIENTS=()     # optional, defaults to VARIENTS = ('default')
-BUILDFLAGS=()   # is converted to BUILDFLAGS_default
-                #  or BUILDFLAGS_varient = () 
-RUNFLAGS=''     # optional
-STDINS=''       # optional
+BENCHSUITE='something'
+BENCHNAME='something'
+#MODE='AUTO'      # optional, choices: AUTO, MANUAL; default is AUTO
+COMPILER='/usr/bin/gcc' # set the compiler to use
+#TIMELIMIT='40'   # optional, set SLURM time limit; default is 60 minutes
+SOURCES=('test.sac')
+#INPUTS=()        # optional, if give all data is copied to temp
+#TARGETS=('seq')  # optional, defaults to TARGETS = ('seq')
+#VARIENTS=('default') # optional, defaults to VARIENTS = ('default')
+BUILDFLAGS=('-g') # is converted to BUILDFLAGS_default
+                  #  or BUILDFLAGS_varient = () 
+#RUNFLAGS=        # optional
+#STDINS=          # optional
 
 # when we build with MANUAL we *must* define BUILD and RUN
 # functions (in AUTO these are ignored and not placed into
