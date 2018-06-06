@@ -1,0 +1,29 @@
+# this is a test file for using the python YML
+# to generate an sbatch script
+
+#mode: 'manual' # can be either 'auto' or 'manual', default: 'auto'
+benchsuite: 'sample'
+benchname: 'sample1'
+sources: ['source one','source two']
+inputs:
+    - 'something.in'
+    - 'anotherthing.in:stdin' # if ':' is found, the RHS indicates
+                              # one of 'arg' or 'stdin', default: 'arg'
+compiler: '/usr/bin/echo' # path to build
+compvars:
+    targets:
+        ['seq','...'] # this is always for different permutations of a
+                      # compiler argument, to use this, just call var in flags.
+compflags: '-g -t {targets} -O3' # or can be given as a dict()
+#compflags:
+#    default: '-g -t {targets} -O3'
+#    emr: '-g -t {targets} -O3 -doEMR' # dict of varients specific flags
+
+# if mode is 'manual' you can specify your own functions
+build: |
+    logger.info("here we can specify almost anything")
+    logger.info("that spans multiple lines")
+
+    logger.info("and that has spaces/newlines")
+run: |
+    logger.info("another example")
