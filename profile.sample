@@ -12,7 +12,7 @@
 BENCHSUITE='something'
 BENCHNAME='something'
 #MODE='AUTO'      # optional, choices: AUTO, MANUAL; default is AUTO
-COMPILER='/usr/bin/gcc' # set the compiler to use
+COMPILER='sac2c' # set the compiler to use
 #TIMELIMIT='40'   # optional, set SLURM time limit; default is 60 minutes
 SOURCES=('test.sac')
 #INPUTS=()        # optional, if give all data is copied to temp

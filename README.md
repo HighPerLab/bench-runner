@@ -17,6 +17,9 @@ stuff I have learned along the way.
 **These scripts and templates are very alpha-stage - they work for me
 though. You have been WARNED**
 
+**Also the scripts are tightly coupled to the [SaC compiler][3] so
+some parts might need changing to make it truly generic.**
+
 General Layout
 --------------
 
@@ -53,6 +56,28 @@ The default template makes use of [environment-module][11] to expose
 some of the underlying binaries that are used. If your system/cluster
 does not use this, don't forget to remove/edit them.
 
+Ideas
+-----
+
+- In short, BASH is really not the best way of doing this. My initial
+  plan for the whole system was very minimal, but as time has
+  progressed, I find that I need/want to do more advanced things but
+  am strongly limited by what BASH is capable of doing. I have already
+  worked on a basic implementation in Python, which among other things
+  seriously improves upon how profiles are decoded.
+- The profile format is very restrictive (understandably) but not in the
+  right way - for instance defining functions is pretty nasty. Clearly
+  I could go and try something like a PKGBUILD-style file (as used by
+  the ArchLinux community) which in essences is a script that is sourced
+  and run directly. One need a lot of boiler plating around this though
+  to make sure its **safe** - `makepkg` script (which is BASH, but uses
+  a lot of external tools) has about 500+ lines of commands designed to
+  sanities the PKGBUILD file before running anything, and even then it
+  is assumed that is isn't safe, so everything is run within a fakeroot
+  and its own environment. I'm not sure I want to implement 500+ lines
+  of code just so I have a more free-form profile format.
+
 [1]: https://www.macs.hw.ac.uk/gitlab/hans/benchmark-profiles
+[3]: https://www.sac-home.org/
 [10]: https://github.com/smxi/inxi
 [11]: http://modules.sourceforge.net/

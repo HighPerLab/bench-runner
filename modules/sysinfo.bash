@@ -23,3 +23,15 @@ sysinfo() {
     "$IXNI" -c 0 -v 4 >&3
     meminfo
 }
+
+get_logical_core_count() {
+    local cores
+    cores=$(lscpu -p | grep -c -E -v '^#')
+    echo "${cores}"
+}
+
+get_physical_core_count() {
+    local cores
+    cores=$(lscpu -p | grep -E -v '^#' | sort -u -t, -k 2,4 | wc -l)
+    echo "${cores}"
+}

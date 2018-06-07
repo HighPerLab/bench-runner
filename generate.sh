@@ -26,9 +26,9 @@ FORCE=false
 PROFDIR="${PWD}"
 
 # get external functions
-source modules/logging.bash
-source modules/sysinfo.bash
-source modules/misc.bash
+for s in modules/*.bash; do
+    source "${s}"
+done
 
 while getopts "vhfid:" flag; do
     case $flag in
@@ -43,7 +43,6 @@ while getopts "vhfid:" flag; do
             ;;
         i)
             sysinfo
-            arraylog "This is a=test to see if it works" "what"
             exit 0
             ;;
         h)
@@ -171,7 +170,7 @@ for profile in "${PROFILES[@]}"; do
 
         # generate sbatch script
         if [ ! -f "${SCRIPT_NAME}" ] || [ "${FORCE}" = true ]; then
-            sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@TIMELIMIT@:${TIMELIMIT}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.template > "${SCRIPT_NAME}"
+            sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@TIMELIMIT@:${TIMELIMIT}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.in > "${SCRIPT_NAME}"
             chmod +x -- "${SCRIPT_NAME}"
         else
             inf "Not updating ${SCRIPT_NAME}"

@@ -28,12 +28,15 @@ error() { __log 2 "ERROR" "$1"; }
 warn() { __log 3 "WARNING" "$1"; }
 inf() { __log 4 "INFO" "$1"; } # "info" is already a command
 debug() { __log 5 "DEBUG" "$1"; }
-__log() {
+__log_noredirect() {
     if [ "$VERBOSITY" -ge "$1" ]; then
         datestring=$(date +'%d-%m-%y %H:%M:%S')
         # Expand escaped characters, wrap at 80 chars, indent wrapped lines
-        printf "[$datestring](%-8s): %s\n" "$2" "$3" | fold -w80 -s | sed '2~1s/^/-----------------------------: /' >&3
+        printf "[$datestring](%-8s): %s\n" "$2" "$3" | fold -w80 -s | sed '2~1s/^/-----------------------------: /'
     fi
+}
+__log() {
+    __log_noredirect "$@" >&3
 }
 # special printer for pairs of data
 arraylog() {
