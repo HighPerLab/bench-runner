@@ -158,6 +158,7 @@ pushd "${WORKDIR}" || exit 10
 # GET SYSTEM INFO
 
 STAGE='INFO'
+inf "Running ${BENCHNAME} from ${BENCHSUITE}"
 inf "Gathering system Information"
 sysinfo
 
