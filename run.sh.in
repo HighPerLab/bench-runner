@@ -160,7 +160,7 @@ pushd "${WORKDIR}" || exit 10
 # GET SYSTEM INFO
 
 STAGE='INFO'
-inf "Running ${BENCHNAME} from ${BENCHSUITE}"
+inf "Running \`${BENCHNAME}' from \`${BENCHSUITE}'"
 inf "Gathering system Information"
 sysinfo
 
@@ -262,13 +262,16 @@ else
                 inf "REPITIION: ${count}/${MAXREP}"
                 __log_noredirect 4 "INFO" "REPETITION: ${count}/${MAXREP}" >> "${binary_log}"
                 if [[ "${target}" =~ "mt" ]]; then
-                    for ((thread = 1; thread <= MAXTHREADS; thread++)); do
-                        inf "  MT MODE: ${thread}/${MAXTHREADS} threads"
-                        __log_noredirect 4 "INFO" "  MT MODE: ${thread}/${MAXTHREADS} threads" >> "${binary_log}"
-                        export SAC_PARALLEL=${thread}
-                        # shellcheck disable=SC2153
-                        timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
-                        unset SAC_PARALLEL
+                    for ((thread = 1; thread <= MAXTHREADS; thread+=1)); do
+                        # we only want even numbers, and one: 1 2 4 6 8 ...
+                        if [ "x${thread}" = "x1" ] || [ "$(( thread % 2 ))" = "0" ]; then
+                            inf "  MT MODE: ${thread}/${MAXTHREADS} threads"
+                            __log_noredirect 4 "INFO" "  MT MODE: ${thread}/${MAXTHREADS} threads" >> "${binary_log}"
+                            export SAC_PARALLEL=${thread}
+                            # shellcheck disable=SC2153
+                            timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
+                            unset SAC_PARALLEL
+                        fi
                     done
                 else # sequentional targets
                     timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
