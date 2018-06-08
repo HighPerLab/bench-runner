@@ -27,6 +27,7 @@ PROFDIR="${PWD}"
 
 # get external functions
 for s in modules/*.bash; do
+    # shellcheck source=/dev/null
     source "${s}"
 done
 
@@ -56,6 +57,9 @@ done
 
 PROFILES=( "${PROFDIR}"/*.profile )
 
+# FIXME again we ignore generics for the moment
+COMPILER=$(which sac2c_p) || critical "Unable to locate sac2c_p binary, exiting..."
+
 if [ ${#PROFILES[@]} -eq 0 ]; then
     critical "No profiles found! Exiting..."
     exit 1
@@ -63,6 +67,7 @@ fi
 
 for profile in "${PROFILES[@]}"; do
     declare -A CURRENTPROFILE
+    # shellcheck disable=SC2162
     while IFS='=' read key value; do
         CURRENTPROFILE[$key]=$value
         debug "[$key] = $value"
@@ -91,8 +96,10 @@ for profile in "${PROFILES[@]}"; do
 
     # check that we have the compiler set
     if [ -z "${CURRENTPROFILE[COMPILER]}" ]; then
-        error "Can't generate script without \`COMPILER' being defined. Skipping '${SCRIPT_NAME}'"
-        skip=true
+        # we'll go back to generics later
+        #error "Can't generate script without \`COMPILER' being defined. Skipping '${SCRIPT_NAME}'"
+        #skip=true
+        CURRENTPROFILE[COMPILER]="'${COMPILER}'"
     fi
 
     # check that we have build for MANUAL mode

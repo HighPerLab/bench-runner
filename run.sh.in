@@ -4,7 +4,9 @@
 # runs for the bench-runner system).
 # BE CAREFUL WHAT YOU CHANGE HERE!
 
-# CURRENTLY WE DO NOT SUPPORT MULTI-THREADED PROGRAMS
+# As this is gear toward SaC based programs and the compiler,
+# there are some strictly non-generic things happening here.
+# For example we do a profiling run.
 
 # SBATCH RELATED
 #SBATCH --exclusive
@@ -97,11 +99,11 @@ timeit() {
     read -r -a runflags <<< "${2}"
     local timerformat='elapsed: %e s'
     local stdin="${4:-/dev/null}"
-    debug "RUN: ./${1} ${runflags[*]} < ${stdin} > ${3}"
-    if ! /usr/bin/time -p -o "timerfile" -f "${timerformat}" ./"${1}" "${runflags[@]}" < "${stdin}" >> "${3}" 2>&3; then
+    debug "RUN: ./${1} ${runflags[*]} < ${stdin} &>> ${3}"
+    if ! /usr/bin/time -p -o "timerfile" -f "${timerformat}" ./"${1}" "${runflags[@]}" < "${stdin}" &>> "${3}"; then
         error_handling
     fi
-    __log_noredirect 4 "INFO" "Time with profiler" >> "${3}"
+    __log_noredirect 4 "INFO" "  Time with profiler" >> "${3}"
     cat "timerfile" >> "${3}"
 }
 
@@ -112,9 +114,9 @@ timeit_cuda() {
     local timerformat='elapsed: %e s'
     local stdin="${4:-/dev/null}"
     inf "Running with NVPROF"
-    debug "RUN: ./${1} ${runflags[*]} < ${stdin} > /dev/null"
-    __log_noredirect 4 "INFO" "Time with CUDA profiler" >> "${3}"
-    if ! nvprof --profile-api-trace all --unified-memory-profiling per-process-device -u ms --csv --log-file "${3}" ./"${1}" "${runflags[@]}" < "${stdin}" > /dev/null 2>&3; then
+    debug "RUN: ./${1} ${runflags[*]} < ${stdin} &> /dev/null"
+    __log_noredirect 4 "INFO" "  CUDA profiler output:" >> "${3}"
+    if ! nvprof --profile-api-trace all --unified-memory-profiling per-process-device -u ms --csv --log-file "${3}" ./"${1}" "${runflags[@]}" < "${stdin}" &> /dev/null; then
         error_handling
     fi
 }
@@ -188,8 +190,14 @@ else
                 binary_name="${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out"
                 build_log="${WORKDIR}/sac2c-build-${target}-${varient}.log"
 
-                inf "compiling target '$target' varient '$varient' with \`${buildflags[*]}'"
-                if ! $COMPILER "${buildflags[@]}" -t "${target}" -o "${binary_name}" "${LOCALDIR}/${source}" &> "${build_log}"; then
+                if [[ ! "${target}" =~ "mt" ]]; then
+                    inf "compiling P-varient target '$target' varient '$varient' with \`${buildflags[*]}'"
+                    if ! $COMPILER "${buildflags[@]}" -profile m -t "${target}" -o "profile-${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
+                        error_handling
+                    fi
+                fi
+                inf "compiling T-varient target '$target' varient '$varient' with \`${buildflags[*]}'"
+                if ! $COMPILER "${buildflags[@]}" -t "${target}" -o "${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
                     error_handling
                 fi
             done
@@ -225,19 +233,38 @@ else
             fi
             binary_name="${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out"
             if [ ! -e "${binary_name}" ]; then
-                error "Binary missing! SKIPPING target '$target' and varient '$varient'"
+                error "Timing binary missing! SKIPPING target '$target' and varient '$varient'"
                 state
                 continue
             fi
-            inf "RUNNING target '$target' with varient '$varient'"
+            # we skip running profiling for MT as its incompatible at the moment
+            if [[ ! "${target}" =~ "mt" ]]; then
+                inf "PROFILING target '$target' with varient '$varient'"
+                binary_log="${WORKDIR}/profile-${BENCHSUITE}-${BENCHNAME}-${target}-${varient}-${count}.log"
+                if [ ! -e "profile-${binary_name}" ]; then
+                    error "Profile binary missing! SKIPPING target '$target' and varient '$varient'"
+                    state
+                    continue
+                fi
+                # shellcheck disable=SC2153
+                timeit "profile-${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
+
+                if [[ "${target}" =~ "cuda" ]]; then
+                    cuda_log="${WORKDIR}/profile-nvprof-${target}-${varient}-${count}.csv.log"
+                    timeit_cuda "profile-${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
+                    unset cuda_log
+                fi
+            fi
+            inf "TIMING target '$target' with varient '$varient'"
             inf "Doing ${MAXREP} repetitions of this run"
+            binary_log="${WORKDIR}/${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
             for ((count=1; count <= MAXREP; count++)); do
-                binary_log="${WORKDIR}/${BENCHSUITE}-${BENCHNAME}-${target}-${varient}-${count}.log"
                 inf "REPITIION: ${count}/${MAXREP}"
+                __log_noredirect 4 "INFO" "REPETITION: ${count}/${MAXREP}" >> "${binary_log}"
                 if [[ "${target}" =~ "mt" ]]; then
                     for ((thread = 1; thread <= MAXTHREADS; thread++)); do
-                        inf "MT MODE: ${thread}/${MAXTHREADS} threads"
-                        __log_noredirect 4 "INFO" "MT MODE: ${thread}/${MAXTHREADS} threads" >> "${binary_log}"
+                        inf "  MT MODE: ${thread}/${MAXTHREADS} threads"
+                        __log_noredirect 4 "INFO" "  MT MODE: ${thread}/${MAXTHREADS} threads" >> "${binary_log}"
                         export SAC_PARALLEL=${thread}
                         # shellcheck disable=SC2153
                         timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
@@ -247,11 +274,14 @@ else
                     timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
 
                     if [[ "${target}" =~ "cuda" ]]; then
+                        # nvprof overwrites file, no support for appending
                         cuda_log="${WORKDIR}/nvprof-${target}-${varient}-${count}.csv.log"
                         timeit_cuda "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
+                        unset cuda_log
                     fi
                 fi
             done
+            unset binary_name binary_log
         done
     done
 fi

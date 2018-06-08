@@ -23,7 +23,7 @@ fi
 VERBOSITY=${VERBOSITY:=3} # default to show warnings
 
 notify() { __log 0 "NOTE" "$1"; } # Always prints
-critical() { __log 1 "CRITICAL" "$1"; }
+critical() { __log 1 "CRITICAL" "$1"; exit 1; }
 error() { __log 2 "ERROR" "$1"; }
 warn() { __log 3 "WARNING" "$1"; }
 inf() { __log 4 "INFO" "$1"; } # "info" is already a command
