@@ -79,7 +79,7 @@ for profile in "${PROFILES[@]}"; do
     skip=false
     FULL_NAME="${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}"
     SCRIPT_NAME="${FULL_NAME}.run.sh"
-    TIMELIMIT="60"
+    TIMELIMIT="1440"
 
     # get time limit
     if [ ! -z "${CURRENTPROFILE[TIMELIMIT]}" ]; then
