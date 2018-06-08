@@ -4,6 +4,7 @@
 ##   We make use of ixni primarily.
 ##
 
+# FIXME we really need a better way of specifying where to find this stuff
 if [ -n "$LOCALDIR" ]; then
     IXNI="$LOCALDIR/inxi/inxi" # location of binary relative to repo submodule
 else
@@ -24,12 +25,14 @@ sysinfo() {
     meminfo
 }
 
+# get number of cores (including hyper-thread cores)
 get_logical_core_count() {
     local cores
     cores=$(lscpu -p | grep -c -E -v '^#')
     echo "${cores}"
 }
 
+# get number of physical cores (excluding hyper-thread cores)
 get_physical_core_count() {
     local cores
     cores=$(lscpu -p | grep -E -v '^#' | sort -u -t, -k 2,4 | wc -l)

@@ -32,7 +32,7 @@ __log_noredirect() {
     if [ "$VERBOSITY" -ge "$1" ]; then
         datestring=$(date +'%d-%m-%y %H:%M:%S')
         # Expand escaped characters, wrap at 80 chars, indent wrapped lines
-        printf "[$datestring](%-8s): %s\n" "$2" "$3" | fold -w80 -s | sed '2~1s/^/-----------------------------: /'
+        printf "[$datestring](%-8s): %s\\n" "$2" "$3" | fold -w80 -s | sed '2~1s/^/-----------------------------: /'
     fi
 }
 __log() {
@@ -41,9 +41,9 @@ __log() {
 # special printer for pairs of data
 arraylog() {
     datestring=$(date +'%d-%m-%y %H:%M:%S')
-    printf "[$datestring](%-8s):\n" "ARRAYLOG" >&3
+    printf "[$datestring](%-8s):\\n" "ARRAYLOG" >&3
     for a in "$@"; do
-        printf "        %s\n" "${a}" | fold -w80 -s | sed '2~1s/^/        /' >&3
+        printf '        %s\n' "${a}" | fold -w80 -s | sed '2~1s/^/        /' >&3
     done
 }
 # this is a wrapper around any command to pipe something to the logfile and/or stderr

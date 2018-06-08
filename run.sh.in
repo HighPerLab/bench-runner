@@ -43,6 +43,7 @@ VERBOSITY=4 # info
 
 # STDLIB
 for p in @PWD@/modules/*.bash; do
+    # shellcheck source=/dev/null
     source "${p}"
 done
 
@@ -52,11 +53,11 @@ exec 2>&1 >&3 # redirect stdout and stderr to fd 3 (logger)
 log_dir()
 {
     local -a content=( "${1}"/* )
-    printf "        ........................ LOCAL FILES .....................\n"
+    printf '        ........................ LOCAL FILES .....................\n'
     for i in "${content[@]}"; do
-        printf "        %s\n" "$(basename "$i")"
+        printf '        %s\n' "$(basename "$i")"
     done
-    printf "        ..........................................................\n"
+    printf '        ..........................................................\n'
 }
 
 state()
@@ -92,10 +93,12 @@ save_logs()
 
 timeit() {
     # params: binary runflags logfile stdin
+    local -a runflags
+    read -r -a runflags <<< "${2}"
     local timerformat='elapsed: %e s'
     local stdin="${4:-/dev/null}"
-    debug "RUN: ./${1} ${2} < ${stdin} > ${3}"
-    if ! /usr/bin/time -p -o "timerfile" -f "${timerformat}" ./"${1}" "${2}" < "${stdin}" >> "${3}" 2>&3; then
+    debug "RUN: ./${1} ${runflags[*]} < ${stdin} > ${3}"
+    if ! /usr/bin/time -p -o "timerfile" -f "${timerformat}" ./"${1}" "${runflags[@]}" < "${stdin}" >> "${3}" 2>&3; then
         error_handling
     fi
     __log_noredirect 4 "INFO" "Time with profiler" >> "${3}"
@@ -104,12 +107,14 @@ timeit() {
 
 timeit_cuda() {
     # params: binary runflags logfile stdin
+    local -a runflags
+    read -r -a runflags <<< "${2}"
     local timerformat='elapsed: %e s'
     local stdin="${4:-/dev/null}"
     inf "Running with NVPROF"
-    debug "RUN: ./${1} ${2} < ${stdin} > /dev/null"
+    debug "RUN: ./${1} ${runflags[*]} < ${stdin} > /dev/null"
     __log_noredirect 4 "INFO" "Time with CUDA profiler" >> "${3}"
-    if ! nvprof --profile-api-trace all --unified-memory-profiling per-process-device -u ms --csv --log-file "${3}" ./"${1}" "${2}" < "${stdin}" > /dev/null 2>&3; then
+    if ! nvprof --profile-api-trace all --unified-memory-profiling per-process-device -u ms --csv --log-file "${3}" ./"${1}" "${runflags[@]}" < "${stdin}" > /dev/null 2>&3; then
         error_handling
     fi
 }
@@ -178,16 +183,16 @@ else
         count=0
         for target in "${TARGETS[@]}"; do
             for varient in "${VARIENTS[@]}"; do
-                buildflags="$(eval echo "\${BUILDFLAGS_${varient}[${count}]}")"
+                read -r -a buildflags <<< "$(eval echo "\${BUILDFLAGS_${varient}[${count}]}")"
                 binary_name="${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out"
                 build_log="${WORKDIR}/sac2c-build-${target}-${varient}.log"
 
-                inf "compiling target '$target' varient '$varient' with \`${buildflags}'"
-                if ! $COMPILER "${buildflags}" -t "${target}" -o "${binary_name}" "${LOCALDIR}/${source}" &> "${build_log}"; then
+                inf "compiling target '$target' varient '$varient' with \`${buildflags[*]}'"
+                if ! $COMPILER "${buildflags[@]}" -t "${target}" -o "${binary_name}" "${LOCALDIR}/${source}" &> "${build_log}"; then
                     error_handling
                 fi
             done
-            count=$(( count + 1))
+            (( count += 1 ))
         done
     done
 fi
@@ -233,6 +238,7 @@ else
                         inf "MT MODE: ${thread}/${MAXTHREADS} threads"
                         __log_noredirect 4 "INFO" "MT MODE: ${thread}/${MAXTHREADS} threads" >> "${binary_log}"
                         export SAC_PARALLEL=${thread}
+                        # shellcheck disable=SC2153
                         timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
                         unset SAC_PARALLEL
                     done
