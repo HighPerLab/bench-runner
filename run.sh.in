@@ -191,12 +191,12 @@ else
                 build_log="${WORKDIR}/sac2c-build-${target}-${varient}.log"
 
                 if [[ ! "${target}" =~ "mt" ]]; then
-                    inf "compiling P-varient target '$target' varient '$varient' with \`${buildflags[*]}'"
+                    inf "compiling Profiling-Version target '$target' variant '$varient' with \`${buildflags[*]}'"
                     if ! $COMPILER "${buildflags[@]}" -profile m -t "${target}" -o "profile-${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
                         error_handling
                     fi
                 fi
-                inf "compiling T-varient target '$target' varient '$varient' with \`${buildflags[*]}'"
+                inf "compiling Timing-Version target '$target' variant '$varient' with \`${buildflags[*]}'"
                 if ! $COMPILER "${buildflags[@]}" -t "${target}" -o "${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
                     error_handling
                 fi
@@ -215,7 +215,7 @@ STAGE="INPUT"
 
 if [ ${#INPUTS[@]} -ne 0 ]; then
     for input in "${INPUTS[@]}"; do
-        inf "copying $input to workdir ${WORKDIR}"
+        inf "copying $input to working directory ${WORKDIR}"
         cp -r "${LOCALDIR}/${input}" "${WORKDIR}/"
     done
 fi
@@ -231,12 +231,12 @@ else
     for target in "${TARGETS[@]}"; do
         for varient in "${VARIENTS[@]}"; do
             if [ ${SKIP[${target}-${varient}]-0} -gt 0 ]; then
-                inf "SKIPPING target '$target' and varient '$varient'"
+                inf "SKIPPING target '$target' and variant '$varient'"
                 continue
             fi
             binary_name="${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out"
             if [ ! -e "${binary_name}" ]; then
-                error "Timing binary missing! SKIPPING target '$target' and varient '$varient'"
+                error "Timing binary missing! SKIPPING target '$target' and variant '$varient'"
                 state
                 continue
             fi
@@ -245,7 +245,7 @@ else
             if [[ ! "${target}" =~ "mt" ]]; then
                 inf "PROFILING target '$target' with variant '$varient'"
                 if [ ! -e "profile-${binary_name}" ]; then
-                    error "Profile binary missing! SKIPPING target '$target' and varient '$varient'"
+                    error "Profile binary missing! SKIPPING target '$target' and variant '$varient'"
                     state
                     continue
                 fi
@@ -261,11 +261,11 @@ else
                     unset cuda_log
                 fi
             fi
-            inf "TIMING target '$target' with varient '$varient'"
+            inf "TIMING target '$target' with variant '$varient'"
             inf "Doing ${MAXREP} repetitions of this run"
             binary_log="${WORKDIR}/${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
             for ((count=1; count <= MAXREP; count++)); do
-                inf "REPITIION: ${count}/${MAXREP}"
+                inf "REPETITION: ${count}/${MAXREP}"
                 __log_noredirect 4 "INFO" "REPETITION: ${count}/${MAXREP}" >> "${binary_log}"
                 if [[ "${target}" =~ "mt" ]]; then
                     for ((thread = 1; thread <= MAXTHREADS; thread+=1)); do
