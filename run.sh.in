@@ -12,7 +12,7 @@
 #SBATCH --exclusive
 #SBATCH --partition specialq
 #SBATCH --exclude gpu01
-#SBATCH --job-name bench-@NAME@
+#SBATCH --job-name @NAME@
 #SBATCH --time @TIMELIMIT@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=hans@viess.mn
@@ -206,6 +206,9 @@ else
     done
 fi
 
+# we should unset the counter from before
+unset count
+
 # HANDLE INPUT SAC_P
 
 STAGE="INPUT"
@@ -237,10 +240,10 @@ else
                 state
                 continue
             fi
+            binary_log="${WORKDIR}/profile-${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
             # we skip running profiling for MT as its incompatible at the moment
             if [[ ! "${target}" =~ "mt" ]]; then
-                inf "PROFILING target '$target' with varient '$varient'"
-                binary_log="${WORKDIR}/profile-${BENCHSUITE}-${BENCHNAME}-${target}-${varient}-${count}.log"
+                inf "PROFILING target '$target' with variant '$varient'"
                 if [ ! -e "profile-${binary_name}" ]; then
                     error "Profile binary missing! SKIPPING target '$target' and varient '$varient'"
                     state
@@ -250,7 +253,10 @@ else
                 timeit "profile-${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
 
                 if [[ "${target}" =~ "cuda" ]]; then
-                    cuda_log="${WORKDIR}/profile-nvprof-${target}-${varient}-${count}.csv.log"
+                    # we need to clear out the nvprof dir as it can get really full...
+                    debug "Clearing the NVPROF tmp directory"
+                    [ -d '/tmp/.nvprof' ] && rm -rf '/tmp/.nvprof'
+                    cuda_log="${WORKDIR}/profile-nvprof-${target}-${varient}.csv.log"
                     timeit_cuda "profile-${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
                     unset cuda_log
                 fi
@@ -276,7 +282,12 @@ else
                 else # sequentional targets
                     timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
 
-                    if [[ "${target}" =~ "cuda" ]]; then
+                    # we should only run this once, as complete profiling data for cuda
+                    # is unnecessary and really expensive to get...
+                    if [[ "${target}" =~ "cuda" && "${count}" == 1 ]]; then
+                        # we need to clear out the nvprof dir as it can get really full...
+                        debug "Clearing the NVPROF tmp directory"
+                        [ -d '/tmp/.nvprof' ] && rm -rf '/tmp/.nvprof'
                         # nvprof overwrites file, no support for appending
                         cuda_log="${WORKDIR}/nvprof-${target}-${varient}-${count}.csv.log"
                         timeit_cuda "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
@@ -284,7 +295,7 @@ else
                     fi
                 fi
             done
-            unset binary_name binary_log
+            unset binary_name binary_log count
         done
     done
 fi
