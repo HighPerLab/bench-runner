@@ -24,7 +24,11 @@ module load shared
 module load gcc/4.8.5
 module load cuda90/toolkit/9.0.176
 module load hwloc/1.11.6
-module load sac/amd-dev-git
+# we want to use the production version as the compiled
+# code is probably a bit faster - and it matchs normal
+# user experience (most users will never use the develop
+# version of the compiler).
+module load sac/amd-prod-git
 
 # BASH SETTINGS
 shopt -s nullglob
@@ -72,24 +76,27 @@ state()
     log_dir "${WORKDIR}"
 }
 
-save_logs()
+saveit()
 {
-    inf "saving workdir logs..."
+    inf "saving work directory..."
 
-    pushd "$WORKDIR" || exit 10
-    logs=( *.log )
-    if [ "${#logs[@]}" -gt 0 ]; then
-        inf "saving ${logs[*]}"
-        if ! tar -cf "${BENCHSUITE}-${BENCHNAME}-result.tar" "${logs[@]}"; then
-            error_handling
-        fi
-        [ -d "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}" ] || mkdir -p "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}"
-        if ! mv "${WORKDIR}/${BENCHSUITE}-${BENCHNAME}-result.tar" "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}/"; then
-            error_handling
-        fi
-    else
-        inf "no logs to save"
+    pushd "/tmp" || exit 10
+
+    # we don't always copy over the sources, so we need to make sure we do this
+    # eventually.
+    # FIXME perhaps we should do this always...
+    for s in "${SOURCES[@]}"; do
+        [ -e "$(basename "${s}")" ] || cp -r "${LOCALDIR}/${s}" "${WORKDIR}/"
+    done
+
+    if ! tar -czf "${BENCHSUITE}-${BENCHNAME}-result.tar.gz" "${WORKDIR}/"; then
+        error_handling
     fi
+    [ -d "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}" ] || mkdir -p "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}"
+    if ! mv "${BENCHSUITE}-${BENCHNAME}-result.tar.gz" "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}/"; then
+        error_handling
+    fi
+    [ -e "${BENCHSUITE}-${BENCHNAME}-result.tar.gz" ] && rm "${BENCHSUITE}-${BENCHNAME}-result.tar.gz"
     popd || exit 10
 }
 
@@ -116,7 +123,7 @@ timeit_cuda() {
     inf "Running with NVPROF"
     debug "RUN: ./${1} ${runflags[*]} < ${stdin} &> /dev/null"
     __log_noredirect 4 "INFO" "  CUDA profiler output:" >> "${3}"
-    if ! nvprof --profile-api-trace all --unified-memory-profiling per-process-device -u ms --csv --log-file "${3}" ./"${1}" "${runflags[@]}" < "${stdin}" &> /dev/null; then
+    if ! nvprof -f --profile-api-trace all --unified-memory-profiling per-process-device -u ms --csv --log-file "${3}" ./"${1}" "${runflags[@]}" < "${stdin}" &> /dev/null; then
         error_handling
     fi
 }
@@ -309,5 +316,5 @@ inf "done running"
 
 STAGE="SAVE"
 
-save_logs
+saveit
 
