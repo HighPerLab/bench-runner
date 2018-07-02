@@ -23,7 +23,10 @@
 shopt -s nullglob
 
 FORCE=false
+OVERRIDE=false
 PROFDIR="${PWD}"
+TARGETS=()
+VARIANTS=()
 
 # get external functions
 for s in modules/*.bash; do
@@ -31,29 +34,45 @@ for s in modules/*.bash; do
     source "${s}"
 done
 
-while getopts "vhfid:" flag; do
+while getopts "vhfid:V:T:" flag; do
     case $flag in
-        f)
-            FORCE=true
-            ;;
         d)
             PROFDIR="${OPTARG}"
             ;;
-        v)  # defaults to level 3 (warn)
-            (( VERBOSITY += 1 ))
+        f)
+            FORCE=true
             ;;
         i)
             sysinfo
             exit 0
             ;;
+        T)  # restrict targets
+            TARGETS+=("${OPTARG}")
+            OVERRIDE=true
+            ;;
+        v)  # defaults to level 3 (warn)
+            (( VERBOSITY += 1 ))
+            ;;
+        V)  # restrict varients
+            VARIANTS+=("${OPTARG}")
+            OVERRIDE=true
+            ;;
         h)
             ;&
         ?)
-            echo "Usage: $0 [-h|-f|-v...] [-d dir]" >&2
+            echo "Usage: $0 [-h|-f|-v...] [-T target] [-V variant] [-d dir]" >&2
             exit 0
             ;;
     esac
 done
+
+# again we through generics out of the window...woo!
+if [ ${#TARGETS[@]} -eq 0 ]; then
+    TARGETS=('seq')
+fi
+if [ ${#VARIANTS[@]} -eq 0 ]; then
+    VARIANTS=('default')
+fi
 
 PROFILES=( "${PROFDIR}"/*.profile )
 
@@ -132,17 +151,21 @@ for profile in "${PROFILES[@]}"; do
             unset 'CURRENTPROFILE[VARIENTS]'
         else
             # set default target
-            if [ -z "${CURRENTPROFILE[TARGETS]}" ]; then
-                CURRENTPROFILE[TARGETS]="('seq')"
+            if [ -z "${CURRENTPROFILE[TARGETS]}" ] || [ "$OVERRIDE" = true ]; then
+                _t=$(printf "'%s' " "${TARGETS[@]}")
+                # we need to remove the trailing space
+                CURRENTPROFILE[TARGETS]="(${_t% })"
             fi
 
             # set default varient
-            if [ -z "${CURRENTPROFILE[VARIENTS]}" ]; then
-                CURRENTPROFILE[VARIENTS]="('default')"
+            if [ -z "${CURRENTPROFILE[VARIENTS]}" ] || [ "$OVERRIDE" = true ]; then
+                _t=$(printf "'%s' " "${VARIANTS[@]}")
+                # we need to remove the trailing space
+                CURRENTPROFILE[VARIENTS]="(${_t% })"
             fi
 
-            IFS=',' read -r -a varients <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[VARIENTS]})"
-            IFS=',' read -r -a targets <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[TARGETS]})"
+            IFS=',' read -r -a varients <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< "${CURRENTPROFILE[VARIENTS]}")"
+            IFS=',' read -r -a targets <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< "${CURRENTPROFILE[TARGETS]}")"
 
             # copy build flags
             for varient in "${varients[@]}"; do
@@ -150,7 +173,7 @@ for profile in "${PROFILES[@]}"; do
                     CURRENTPROFILE[BUILDFLAGS_${varient//\'}]="${CURRENTPROFILE[BUILDFLAGS]}"
                 fi
                 if [ "${#targets[@]}" -gt 1 ]; then
-                    IFS=',' read -r -a buildflags <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< ${CURRENTPROFILE[BUILDFLAGS_${varient//\'}]})"
+                    IFS=',' read -r -a buildflags <<< "$(sed -e "s/' /',/g" -e "s/[()]//g" <<< "${CURRENTPROFILE[BUILDFLAGS_${varient//\'}]}")"
                     for (( i=0; i<${#targets[@]}; i++ )); do
                         if [ -z "${buildflags[${i}]}" ]; then
                             buildflags[${i}]="${buildflags[0]}"
@@ -186,6 +209,7 @@ for profile in "${PROFILES[@]}"; do
     fi
 
     # clear variables
+    unset _t
     unset CURRENTPROFILE
     unset PROFILEOUT
     unset targets
