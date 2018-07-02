@@ -264,7 +264,7 @@ else
                     debug "Clearing the NVPROF tmp directory"
                     [ -d '/tmp/.nvprof' ] && rm -rf '/tmp/.nvprof'
                     cuda_log="${WORKDIR}/profile-nvprof-${target}-${varient}.csv.log"
-                    timeit_cuda "profile-${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
+                    timeit_cuda "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
                     unset cuda_log
                 fi
             fi
@@ -288,18 +288,6 @@ else
                     done
                 else # sequentional targets
                     timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
-
-                    # we should only run this once, as complete profiling data for cuda
-                    # is unnecessary and really expensive to get...
-                    if [[ "${target}" =~ "cuda" && "${count}" == 1 ]]; then
-                        # we need to clear out the nvprof dir as it can get really full...
-                        debug "Clearing the NVPROF tmp directory"
-                        [ -d '/tmp/.nvprof' ] && rm -rf '/tmp/.nvprof'
-                        # nvprof overwrites file, no support for appending
-                        cuda_log="${WORKDIR}/nvprof-${target}-${varient}-${count}.csv.log"
-                        timeit_cuda "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
-                        unset cuda_log
-                    fi
                 fi
             done
             unset binary_name binary_log count
