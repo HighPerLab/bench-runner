@@ -46,6 +46,12 @@ The underlying concept for how my framework is this:
   generated log output and stored this on a shared partition (we delete
   the temporary directory.
 
+Documentation
+-------------
+
+Documentation of some of teh scripts (and their internals) can be found
+under the `doc/` directory.
+
 External Resources
 ------------------
 
@@ -69,7 +75,7 @@ Ideas
   right way - for instance defining functions is pretty nasty. Clearly
   I could go and try something like a PKGBUILD-style file (as used by
   the ArchLinux community) which in essences is a script that is sourced
-  and run directly. One need a lot of boiler plating around this though
+  and run directly. This needs a lot of boiler plating around this though
   to make sure its **safe** - `makepkg` script (which is BASH, but uses
   a lot of external tools) has about 500+ lines of commands designed to
   sanities the PKGBUILD file before running anything, and even then it
