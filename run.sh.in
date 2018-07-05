@@ -80,10 +80,10 @@ log_dir()
 
 state()
 {
-    arraylog "STAGE = ${STAGE}" "COMPILER = ${COMPILER}" \
-        "WORKDIR = ${WORKDIR}" "LOCALDIR = ${LOCALDIR}"  \
-        "TARGET = ${target:-unset}"                      \
-        "VARIENT = ${varient:-unset}"                    \
+    arraylog "STAGE = ${STAGE}" \
+        "COMPILER = ${COMPILER}" "WORKDIR = ${WORKDIR}" \
+        "LOCALDIR = ${LOCALDIR}" "TARGET = ${target:-unset}" \
+        "VARIENT = ${varient:-unset}" \
         "BUILDFLAGS = ${buildflags:-unset}"
     log_dir "${WORKDIR}"
 }
@@ -162,8 +162,8 @@ error_handling()
     error "An error was detected, getting state information"
     state
     if [ "x${STAGE}" = "xBUILD" ]; then
-        warn "will skip running \`${target}-${varient}' later..."
-        SKIP["${target}-${varient}"]=1
+        warn "will skip running \`${target}-${varient}-${btype}' later..."
+        SKIP["${target}-${varient}-${btype}"]=1
     fi
     inf "Trying to continue..."
 }
@@ -219,15 +219,18 @@ else
                 build_log="${WORKDIR}/sac2c-build-${target}-${varient}.log"
 
                 if [[ ! "${target}" =~ "mt" ]]; then
+                    btype='p'
                     inf "compiling Profiling-Version target '$target' variant '$varient' with \`${buildflags[*]}'"
                     if ! $COMPILER "${buildflags[@]}" -profile m -t "${target}" -o "profile-${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
                         error_handling
                     fi
                 fi
+                btype='t'
                 inf "compiling Timing-Version target '$target' variant '$varient' with \`${buildflags[*]}'"
                 if ! $COMPILER "${buildflags[@]}" -t "${target}" -o "${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
                     error_handling
                 fi
+                unset btype
             done
             (( count += 1 ))
         done
@@ -258,10 +261,6 @@ if [ "x${MODE}" = "xMANUAL" ]; then
 else
     for target in "${TARGETS[@]}"; do
         for varient in "${VARIENTS[@]}"; do
-            if [ ${SKIP[${target}-${varient}]-0} -gt 0 ]; then
-                inf "SKIPPING target '$target' and variant '$varient'"
-                continue
-            fi
             binary_name="${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out"
             if [ ! -e "${binary_name}" ]; then
                 error "Timing binary missing! SKIPPING target '$target' and variant '$varient'"
@@ -271,46 +270,54 @@ else
             binary_log="${WORKDIR}/profile-${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
             # we skip running profiling for MT as its incompatible at the moment
             if [[ ! "${target}" =~ "mt" ]]; then
-                inf "PROFILING target '$target' with variant '$varient'"
-                if [ ! -e "profile-${binary_name}" ]; then
-                    error "Profile binary missing! SKIPPING target '$target' and variant '$varient'"
-                    state
-                    continue
-                fi
-                # shellcheck disable=SC2153
-                timeit "profile-${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
+                if [ ${SKIP[${target}-${varient}-p]-0} -gt 0 ]; then
+                    inf "SKIPPING profiling target '$target' and variant '$varient'"
+                else
+                    inf "PROFILING target '$target' with variant '$varient'"
+                    if [ ! -e "profile-${binary_name}" ]; then
+                        error "Profile binary missing! SKIPPING target '$target' and variant '$varient'"
+                        state
+                        continue
+                    fi
+                    # shellcheck disable=SC2153
+                    timeit "profile-${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
 
-                if [[ "${target}" =~ "cuda" ]]; then
-                    # we need to clear out the nvprof dir as it can get really full...
-                    debug "Clearing the NVPROF tmp directory"
-                    [ -d '/tmp/.nvprof' ] && rm -rf '/tmp/.nvprof'
-                    cuda_log="${WORKDIR}/profile-nvprof-${target}-${varient}.csv.log"
-                    timeit_cuda "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
-                    unset cuda_log
+                    if [[ "${target}" =~ "cuda" ]]; then
+                        # we need to clear out the nvprof dir as it can get really full...
+                        debug "Clearing the NVPROF tmp directory"
+                        [ -d '/tmp/.nvprof' ] && rm -rf '/tmp/.nvprof'
+                        cuda_log="${WORKDIR}/profile-nvprof-${target}-${varient}.csv.log"
+                        timeit_cuda "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
+                        unset cuda_log
+                    fi
                 fi
             fi
-            inf "TIMING target '$target' with variant '$varient'"
-            inf "Doing ${MAXREP} repetitions of this run"
-            binary_log="${WORKDIR}/${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
-            for ((count=1; count <= MAXREP; count++)); do
-                inf "REPETITION: ${count}/${MAXREP}"
-                __log_noredirect 4 "INFO" "REPETITION: ${count}/${MAXREP}" >> "${binary_log}"
-                if [[ "${target}" =~ "mt" ]]; then
-                    for ((thread = 1; thread <= MAXTHREADS; thread+=1)); do
-                        # we only want even numbers, and one: 1 2 4 6 8 ...
-                        if [ "x${thread}" = "x1" ] || [ "$(( thread % 2 ))" = "0" ]; then
-                            inf "  MT MODE: ${thread}/${MAXTHREADS} threads"
-                            __log_noredirect 4 "INFO" "  MT MODE: ${thread}/${MAXTHREADS} threads" >> "${binary_log}"
-                            export SAC_PARALLEL=${thread}
-                            # shellcheck disable=SC2153
-                            timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
-                            unset SAC_PARALLEL
-                        fi
-                    done
-                else # sequentional targets
-                    timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
-                fi
-            done
+            if [ ${SKIP[${target}-${varient}-t]-0} -gt 0 ]; then
+                inf "SKIPPING timing target '$target' and variant '$varient'"
+            else
+                inf "TIMING target '$target' with variant '$varient'"
+                inf "Doing ${MAXREP} repetitions of this run"
+                binary_log="${WORKDIR}/${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
+                for ((count=1; count <= MAXREP; count++)); do
+                    inf "REPETITION: ${count}/${MAXREP}"
+                    __log_noredirect 4 "INFO" "REPETITION: ${count}/${MAXREP}" >> "${binary_log}"
+                    if [[ "${target}" =~ "mt" ]]; then
+                        for ((thread = 1; thread <= MAXTHREADS; thread+=1)); do
+                            # we only want even numbers, and one: 1 2 4 6 8 ...
+                            if [ "x${thread}" = "x1" ] || [ "$(( thread % 2 ))" = "0" ]; then
+                                inf "  MT MODE: ${thread}/${MAXTHREADS} threads"
+                                __log_noredirect 4 "INFO" "  MT MODE: ${thread}/${MAXTHREADS} threads" >> "${binary_log}"
+                                export SAC_PARALLEL=${thread}
+                                # shellcheck disable=SC2153
+                                timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
+                                unset SAC_PARALLEL
+                            fi
+                        done
+                    else # sequentional targets
+                        timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
+                    fi
+                done
+            fi
             unset binary_name binary_log count
         done
     done
