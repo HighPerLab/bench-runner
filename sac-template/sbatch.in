@@ -1,0 +1,8 @@
+#SBATCH --exclusive
+#SBATCH --partition specialq
+#SBATCH --exclude gpu01
+#SBATCH --job-name @NAME@
+#SBATCH --time @TIMELIMIT@
+#SBATCH --mail-type=FAIL
+#SBATCH --mail-user=hans@viess.mn
+#SBATCH --gres=gpu:k20:1

@@ -1,0 +1,3 @@
+STAGE="NULL"
+declare -A SKIP
+LOCALDIR="@PWD@"

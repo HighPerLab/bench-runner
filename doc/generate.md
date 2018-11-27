@@ -6,7 +6,7 @@ generate - generate a SLURM-compatible script from a bench-runner profile
 Synopsis
 --------
 
-generate [-h|-f|-v...] [-T target] [-V variant] [-d directory]
+    ./generate.sh [-h|-f|-v...] [-t dir] [-T target] [-V variant] [-d dir]
 
 Description
 -----------
@@ -21,9 +21,11 @@ can be run through SLURM.
 Options
 -------
 
+
     -h         print usage message and exit
     -f         force; overwrite existing scripts
     -v...      increase verbosity (can be given multiple times)
+    -t dir     directory with template input files to build sbatch script
     -T target  specify which targets to encode (overrides profile); can be given
                multiple times
     -V variant specify which variants to encode (overrides profile) can be given

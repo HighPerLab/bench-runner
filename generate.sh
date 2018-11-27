@@ -25,8 +25,11 @@ shopt -s nullglob
 FORCE=false
 OVERRIDE=false
 PROFDIR="${PWD}"
+# FIXME we want to point this to something more generic
+TDIR="sac-template"
 TARGETS=()
 VARIANTS=()
+VERBOSITY=0
 
 # get external functions
 for s in modules/*.bash; do
@@ -34,7 +37,7 @@ for s in modules/*.bash; do
     source "${s}"
 done
 
-while getopts "vhfid:V:T:" flag; do
+while getopts "vhfid:V:t:T:" flag; do
     case $flag in
         d)
             PROFDIR="${OPTARG}"
@@ -45,6 +48,9 @@ while getopts "vhfid:V:T:" flag; do
         i)
             sysinfo
             exit 0
+            ;;
+        t)
+            TDIR="${OPTARG}"
             ;;
         T)  # restrict targets
             TARGETS+=("${OPTARG}")
@@ -60,11 +66,25 @@ while getopts "vhfid:V:T:" flag; do
         h)
             ;&
         ?)
-            echo "Usage: $0 [-h|-f|-v...] [-T target] [-V variant] [-d dir]" >&2
+            echo "Usage: $0 [-h|-f|-v...] [-t dir] [-T target] [-V variant] [-d dir]" >&2
+            echo "" >&2
+            echo "Generate SBATCH compatible scripts based upon profile files and a script template" >&2
+            echo "" >&2
+            echo "More help:" >&2
+            printf "%5s  %s\\n" "-h" "this help message" >&2
+            printf "%5s  %s\\n" "-f" "force overwrite of existing sbatch scripts" >&2
+            printf "%5s  %s\\n" "-v" "increase verbosity (specify multiple times for higher verbosity)" >&2
+            printf "%5s  %s\\n" "-t" "directory with the sbatch template" >&2
+            printf "%5s  %s\\n" "-T" "restrict profile generation to specified target" >&2
+            printf "%5s  %s\\n" "-V" "restrict profile generation to specified variant" >&2
+            printf "%5s  %s\\n" "-d" "directory will profile file(s)" >&2
             exit 0
             ;;
     esac
 done
+
+# initiat logging
+loginit $VERBOSITY
 
 # again we through generics out of the window...woo!
 if [ ${#TARGETS[@]} -eq 0 ]; then
@@ -77,12 +97,16 @@ fi
 PROFILES=( "${PROFDIR}"/*.profile )
 
 # FIXME again we ignore generics for the moment
-COMPILER=$(which sac2c_p) || critical "Unable to locate sac2c_p binary, exiting..."
+COMPILER=$(command -v sac2c_p) || critical "Unable to locate sac2c_p binary, exiting..."
 
 if [ ${#PROFILES[@]} -eq 0 ]; then
     critical "No profiles found! Exiting..."
     exit 1
 fi
+
+# we compile the bash modules into a single file
+BMODF="$(mktemp)"
+cat modules/*.bash > "${BMODF}"
 
 for profile in "${PROFILES[@]}"; do
     declare -A CURRENTPROFILE
@@ -201,7 +225,11 @@ for profile in "${PROFILES[@]}"; do
 
         # generate sbatch script
         if [ ! -f "${SCRIPT_NAME}" ] || [ "${FORCE}" = true ]; then
-            sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@TIMELIMIT@:${TIMELIMIT}:" -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" run.sh.in > "${SCRIPT_NAME}"
+            sed -e "/## SBATCH/ r ${TDIR}/sbatch.in" -e "/## ENVMODULES/ r ${TDIR}/envmodules.in" \
+                -e "/## GLOBALS/ r ${TDIR}/globals.in" -e "/## BASHMODULES/ r ${BMODF}" \
+                -e "/## SCRIPT/ r ${TDIR}/script.sh.in" basic-template.sh.in |\
+            sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@TIMELIMIT@:${TIMELIMIT}:" \
+                -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" > "${SCRIPT_NAME}"
             chmod +x -- "${SCRIPT_NAME}"
         else
             inf "Not updating ${SCRIPT_NAME}"
@@ -216,3 +244,5 @@ for profile in "${PROFILES[@]}"; do
     unset varients
     unset buildflags
 done
+
+[ -f "${BMODF}" ] && rm "${BMODF}"

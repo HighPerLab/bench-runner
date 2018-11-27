@@ -1,0 +1,10 @@
+module purge
+module load shared
+module load gcc/4.8.5
+module load cuda90/toolkit/9.0.176
+module load hwloc/1.11.6
+# we want to use the production version as the compiled
+# code is probably a bit faster - and it matchs normal
+# user experience (most users will never use the develop
+# version of the compiler).
+module load sac/amd-prod-git

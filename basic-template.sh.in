@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+# THIS IS A TEMPLATE FILE (it will be used globally to define
+# runs for the bench-runner system).
+# BE CAREFUL WHAT YOU CHANGE HERE!
+
+## SBATCH
+
+## BASHSETTINGS
+shopt -s nullglob
+set -bm
+
+## GLOBALS
+
+## ENVMODULES
+
+## BASHMODULES
+
+## PROFILE
+@PROFILE@
+
+## SCRIPT
