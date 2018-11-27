@@ -141,7 +141,7 @@ else
                 if [[ ! "${target}" =~ "mt" ]]; then
                     btype='p'
                     inf "compiling Profiling-Version target '$target' variant '$varient' with \`${buildflags[*]}'"
-                    if ! $COMPILER "${buildflags[@]}" -profile m -t "${target}" -o "profile-${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
+                    if ! $COMPILER "${buildflags[@]}" -profile m -check u -t "${target}" -o "profile-${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
                         error_handling
                     fi
                 fi
