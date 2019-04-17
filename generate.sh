@@ -27,21 +27,11 @@ OVERRIDE=false
 PROFDIR="${PWD}"
 RDIR="${PWD}"
 # FIXME we want to point this to something more generic
-TDIR="${RDIR}/sac-template"
+TDIR="sac-template"
 TARGETS=()
 VARIANTS=()
 VERBOSITY=0
-
-if [ ! -d "${RDIR}/modules" ]; then
-    echo "Can't find shell modules! Exiting..." >&2
-    exit 1
-fi
-
-# get external functions
-for s in ${RDIR}/modules/*.bash; do
-    # shellcheck source=/dev/null
-    source "${s}"
-done
+DOSYSINFO=false
 
 while getopts "vhfid:V:r:t:T:" flag; do
     case $flag in
@@ -52,8 +42,8 @@ while getopts "vhfid:V:r:t:T:" flag; do
             FORCE=true
             ;;
         i)
-            sysinfo
-            exit 0
+            DOSYSINFO=true
+            break
             ;;
         r)
             RDIR="${OPTARG}"
@@ -94,10 +84,26 @@ while getopts "vhfid:V:r:t:T:" flag; do
     esac
 done
 
+if [ ! -d "${RDIR}/modules" ]; then
+    echo "Can't find shell modules! Exiting..." >&2
+    exit 1
+fi
+
+# get external functions
+for s in ${RDIR}/modules/*.bash; do
+    # shellcheck source=/dev/null
+    source "${s}"
+done
+
 # initiat logging
 loginit $VERBOSITY
 
-if [ ! -d "${TDIR}" ]; then
+if [ "${DOSYSINFO}" = true ]; then
+    sysinfo
+    exit 0
+fi
+
+if [ ! -d "${RDIR}/${TDIR}" ]; then
     critical "Template dir could not be found! Exiting..."
     exit 1
 fi
@@ -242,9 +248,9 @@ for profile in "${PROFILES[@]}"; do
 
         # generate sbatch script
         if [ ! -f "${SCRIPT_NAME}" ] || [ "${FORCE}" = true ]; then
-            sed -e "/## SBATCH/ r ${TDIR}/sbatch.in" -e "/## ENVMODULES/ r ${TDIR}/envmodules.in" \
-                -e "/## GLOBALS/ r ${TDIR}/globals.in" -e "/## BASHMODULES/ r ${BMODF}" \
-                -e "/## SCRIPT/ r ${TDIR}/script.sh.in" basic-template.sh.in |\
+            sed -e "/## SBATCH/ r ${RDIR}/${TDIR}/sbatch.in" -e "/## ENVMODULES/ r ${RDIR}/${TDIR}/envmodules.in" \
+                -e "/## GLOBALS/ r ${RDIR}/${TDIR}/globals.in" -e "/## BASHMODULES/ r ${BMODF}" \
+                -e "/## SCRIPT/ r ${RDIR}/${TDIR}/script.sh.in" ${RDIR}/basic-template.sh.in |\
             sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@TIMELIMIT@:${TIMELIMIT}:" \
                 -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" > "${SCRIPT_NAME}"
             chmod +x -- "${SCRIPT_NAME}"
