@@ -25,19 +25,25 @@ shopt -s nullglob
 FORCE=false
 OVERRIDE=false
 PROFDIR="${PWD}"
+RDIR="${PWD}"
 # FIXME we want to point this to something more generic
-TDIR="sac-template"
+TDIR="${RDIR}/sac-template"
 TARGETS=()
 VARIANTS=()
 VERBOSITY=0
 
+if [ ! -d "${RDIR}/modules" ]; then
+    echo "Can't find shell modules! Exiting..." >&2
+    exit 1
+fi
+
 # get external functions
-for s in modules/*.bash; do
+for s in ${RDIR}/modules/*.bash; do
     # shellcheck source=/dev/null
     source "${s}"
 done
 
-while getopts "vhfid:V:t:T:" flag; do
+while getopts "vhfid:V:r:t:T:" flag; do
     case $flag in
         d)
             PROFDIR="${OPTARG}"
@@ -48,6 +54,9 @@ while getopts "vhfid:V:t:T:" flag; do
         i)
             sysinfo
             exit 0
+            ;;
+        r)
+            RDIR="${OPTARG}"
             ;;
         t)
             TDIR="${OPTARG}"
@@ -66,18 +75,20 @@ while getopts "vhfid:V:t:T:" flag; do
         h)
             ;&
         ?)
-            echo "Usage: $0 [-h|-f|-v...] [-t dir] [-T target] [-V variant] [-d dir]" >&2
+            echo "Usage: $0 [-h|-f|-v...] [-r dir] [-t dir] [-T target] [-V variant] [-d dir]" >&2
             echo "" >&2
             echo "Generate SBATCH compatible scripts based upon profile files and a script template" >&2
             echo "" >&2
             echo "More help:" >&2
-            printf "%5s  %s\\n" "-h" "this help message" >&2
+            printf "%5s  %s\\n" "-d" "directory will profile file(s)" >&2
             printf "%5s  %s\\n" "-f" "force overwrite of existing sbatch scripts" >&2
-            printf "%5s  %s\\n" "-v" "increase verbosity (specify multiple times for higher verbosity)" >&2
+            printf "%5s  %s\\n" "-h" "this help message and exit" >&2
+            printf "%5s  %s\\n" "-i" "display system info and exit" >&2
+            printf "%5s  %s\\n" "-r" "root directory (where bench-runner files are)" >&2
             printf "%5s  %s\\n" "-t" "directory with the sbatch template" >&2
             printf "%5s  %s\\n" "-T" "restrict profile generation to specified target" >&2
+            printf "%5s  %s\\n" "-v" "increase verbosity (specify multiple times for higher verbosity)" >&2
             printf "%5s  %s\\n" "-V" "restrict profile generation to specified variant" >&2
-            printf "%5s  %s\\n" "-d" "directory will profile file(s)" >&2
             exit 0
             ;;
     esac
@@ -85,6 +96,11 @@ done
 
 # initiat logging
 loginit $VERBOSITY
+
+if [ ! -d "${TDIR}" ]; then
+    critical "Template dir could not be found! Exiting..."
+    exit 1
+fi
 
 # again we through generics out of the window...woo!
 if [ ${#TARGETS[@]} -eq 0 ]; then
@@ -104,9 +120,10 @@ if [ ${#PROFILES[@]} -eq 0 ]; then
     exit 1
 fi
 
+
 # we compile the bash modules into a single file
 BMODF="$(mktemp)"
-cat modules/*.bash > "${BMODF}"
+cat ${RDIR}/modules/*.bash > "${BMODF}"
 
 for profile in "${PROFILES[@]}"; do
     declare -A CURRENTPROFILE
