@@ -46,10 +46,10 @@ while getopts "vhfid:V:r:t:T:" flag; do
             break
             ;;
         r)
-            RDIR="${OPTARG}"
+            RDIR="$(readlink -f -- "${OPTARG}")"
             ;;
         t)
-            TDIR="${OPTARG}"
+            TDIR="$(readlink -f -- "${OPTARG}")"
             ;;
         T)  # restrict targets
             TARGETS+=("${OPTARG}")
