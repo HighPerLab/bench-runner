@@ -5,8 +5,8 @@
 ##
 
 # FIXME we really need a better way of specifying where to find this stuff
-if [ -n "$LOCALDIR" ]; then
-    IXNI="$LOCALDIR/inxi/inxi" # location of binary relative to repo submodule
+if [ -n "$RUNNERDIR" ]; then
+    IXNI="$RUNNERDIR/inxi/inxi" # location of binary relative to repo submodule
 else
     IXNI='./inxi/inxi' # location of binary relative to repo submodule
 fi

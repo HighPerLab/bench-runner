@@ -11,6 +11,7 @@ shopt -s nullglob
 set -bm
 
 ## GLOBALS
+readonly RUNNERDIR="@RUNNERDIR@"
 
 ## ENVMODULES
 

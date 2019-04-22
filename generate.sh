@@ -116,6 +116,11 @@ if [ ${#VARIANTS[@]} -eq 0 ]; then
     VARIANTS=('default')
 fi
 
+if [ ! -d "${PROFDIR}" ]; then
+    critical "Profile dir could not be found! Exiting..."
+    exit 1
+fi
+
 PROFILES=( "${PROFDIR}"/*.profile )
 
 # FIXME again we ignore generics for the moment
@@ -252,7 +257,7 @@ for profile in "${PROFILES[@]}"; do
                 -e "/## GLOBALS/ r ${RDIR}/${TDIR}/globals.in" -e "/## BASHMODULES/ r ${BMODF}" \
                 -e "/## SCRIPT/ r ${RDIR}/${TDIR}/script.sh.in" ${RDIR}/basic-template.sh.in |\
             sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@TIMELIMIT@:${TIMELIMIT}:" \
-                -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@PWD@:${PWD}:" > "${SCRIPT_NAME}"
+                -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@RUNNERDIR@:${RDIR}:" -e "s:@PWD@:${PWD}:" > "${SCRIPT_NAME}"
             chmod +x -- "${SCRIPT_NAME}"
         else
             inf "Not updating ${SCRIPT_NAME}"
