@@ -49,7 +49,7 @@ The underlying concept for how my framework is this:
 Documentation
 -------------
 
-Documentation of some of teh scripts (and their internals) can be found
+Documentation of some of the scripts (and their internals) can be found
 under the `doc/` directory.
 
 External Resources
