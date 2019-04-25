@@ -206,8 +206,14 @@ else
                         # we need to clear out the nvprof dir as it can get really full...
                         debug "Clearing the NVPROF tmp directory"
                         [ -d '/tmp/.nvprof' ] && rm -rf '/tmp/.nvprof'
+                        inf "PROFILING GPU for '$target' with varient '$varient'"
                         cuda_log="${WORKDIR}/profile-nvprof-${target}-${varient}.csv.log"
                         timeit_cuda "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
+                        if [[ ! "${target}" =~ "_man" ]]; then
+                            inf "TRACING GPU operations for '$target' with varient '$varient'"
+                            cuda_log="${WORKDIR}/trace-nvprof-${target}-${varient}.csv.log"
+                            nvprof_trace "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
+                        fi
                         unset cuda_log
                     fi
                 fi
