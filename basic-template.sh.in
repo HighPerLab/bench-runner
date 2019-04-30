@@ -4,7 +4,7 @@
 # runs for the bench-runner system).
 # BE CAREFUL WHAT YOU CHANGE HERE!
 
-## SBATCH
+## BATCH
 
 ## BASHSETTINGS
 shopt -s nullglob

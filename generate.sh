@@ -32,9 +32,19 @@ TARGETS=()
 VARIANTS=()
 VERBOSITY=0
 DOSYSINFO=false
+readonly _batchtypes=('slurm' 'pbs')
+BATCHSYS=${_batchtypes[0]}
 
-while getopts "vhfid:V:r:t:T:" flag; do
+while getopts "vhfib:d:V:r:t:T:" flag; do
     case $flag in
+        b)
+            if [[ "${_batchtypes[*]}" =~ ${OPTARG} ]]; then
+                BATCHSYS="${OPTARG}"
+            else
+                echo "Value \`${OPTARG}' is not valid batch system type!" >&2
+                exit 12
+            fi
+            ;;
         d)
             PROFDIR="${OPTARG}"
             ;;
@@ -65,11 +75,12 @@ while getopts "vhfid:V:r:t:T:" flag; do
         h)
             ;&
         ?)
-            echo "Usage: $0 [-h|-f|-v...] [-r dir] [-t dir] [-T target] [-V variant] [-d dir]" >&2
+            echo "Usage: $0 [-h|-f|-v...] [-b bsys] [-r dir] [-t dir] [-T target] [-V variant] [-d dir]" >&2
             echo "" >&2
-            echo "Generate SBATCH compatible scripts based upon profile files and a script template" >&2
+            echo "Generate batch system compatible scripts based upon profile files and a script template" >&2
             echo "" >&2
             echo "More help:" >&2
+            printf "%5s  %s\\n" "-b" "batch system to generate for (default: slurm, choices: slurm, pbs)" >&2
             printf "%5s  %s\\n" "-d" "directory will profile file(s)" >&2
             printf "%5s  %s\\n" "-f" "force overwrite of existing sbatch scripts" >&2
             printf "%5s  %s\\n" "-h" "this help message and exit" >&2
@@ -253,7 +264,7 @@ for profile in "${PROFILES[@]}"; do
 
         # generate sbatch script
         if [ ! -f "${SCRIPT_NAME}" ] || [ "${FORCE}" = true ]; then
-            sed -e "/## SBATCH/ r ${RDIR}/${TDIR}/sbatch.in" -e "/## ENVMODULES/ r ${RDIR}/${TDIR}/envmodules.in" \
+            sed -e "/## BATCH/ r ${RDIR}/${TDIR}/${BATCHSYS}.in" -e "/## ENVMODULES/ r ${RDIR}/${TDIR}/envmodules.in" \
                 -e "/## GLOBALS/ r ${RDIR}/${TDIR}/globals.in" -e "/## BASHMODULES/ r ${BMODF}" \
                 -e "/## SCRIPT/ r ${RDIR}/${TDIR}/script.sh.in" ${RDIR}/basic-template.sh.in |\
             sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@TIMELIMIT@:${TIMELIMIT}:" \

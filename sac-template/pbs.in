@@ -1,0 +1,5 @@
+#PBS -q gpu
+#PBS -l select=1:ncpus=2:ngpus=1
+#PBS -N @NAME@
+#PBS -l walltime=@TIMELIMIT@
+#PBS -M hans@viess.mn
