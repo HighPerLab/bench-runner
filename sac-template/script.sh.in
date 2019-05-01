@@ -201,21 +201,6 @@ else
                     fi
                     # shellcheck disable=SC2153
                     timeit "profile-${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
-
-                    if [[ "${target}" =~ "cuda" ]]; then
-                        # we need to clear out the nvprof dir as it can get really full...
-                        debug "Clearing the NVPROF tmp directory"
-                        [ -d '/tmp/.nvprof' ] && rm -rf '/tmp/.nvprof'
-                        inf "PROFILING GPU for '$target' with varient '$varient'"
-                        cuda_log="${WORKDIR}/profile-nvprof-${target}-${varient}.csv.log"
-                        timeit_cuda "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
-                        if [[ ! "${target}" =~ "_man" ]]; then
-                            inf "TRACING GPU operations for '$target' with varient '$varient'"
-                            cuda_log="${WORKDIR}/trace-nvprof-${target}-${varient}.csv.log"
-                            nvprof_trace "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
-                        fi
-                        unset cuda_log
-                    fi
                 fi
             fi
             if [ ${SKIP[${target}-${varient}-t]-0} -gt 0 ]; then
@@ -243,6 +228,21 @@ else
                         timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
                     fi
                 done
+
+                if [[ "${target}" =~ "cuda" ]]; then
+                    inf "TIMING GPU target '$target' with variant '$varient'"
+                    # we need to clear out the nvprof dir as it can get really full...
+                    debug "Clearing the NVPROF tmp directory"
+                    [ -d '/tmp/.nvprof' ] && rm -rf '/tmp/.nvprof'
+                    cuda_log="${WORKDIR}/profile-nvprof-${target}-${varient}.csv.log"
+                    timeit_cuda "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
+                    if [[ ! "${target}" =~ "_man" ]]; then
+                        inf "TRACING GPU operations for '$target' with varient '$varient'"
+                        cuda_log="${WORKDIR}/trace-nvprof-${target}-${varient}.csv.log"
+                        nvprof_trace "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
+                    fi
+                    unset cuda_log
+                fi
             fi
             unset binary_name binary_log count
         done
