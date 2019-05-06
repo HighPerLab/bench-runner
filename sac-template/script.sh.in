@@ -37,6 +37,9 @@ saveit()
 {
     inf "saving work directory..."
 
+    # copy current script over as well (must happen before pushd)
+    cp "$(readlink -f "$USCRIPT")" "${WORKDIR}/"
+
     pushd "/tmp" || exit 10
 
     # we don't always copy over the sources, so we need to make sure we do this
@@ -46,7 +49,7 @@ saveit()
         [ -e "$(basename "${s}")" ] || cp -r "${LOCALDIR}/${s}" "${WORKDIR}/"
     done
 
-    if ! tar -czf "${BENCHSUITE}-${BENCHNAME}-result.tar.gz" "${WORKDIR}/"; then
+    if ! tar -czf "${BENCHSUITE}-${BENCHNAME}-result.tar.gz" -C "${WORKDIR}" --exclude "timerfile" .; then
         error_handling
     fi
     [ -d "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}" ] || mkdir -p "${LOCALDIR}/results/${BENCHSUITE}-${BENCHNAME}"

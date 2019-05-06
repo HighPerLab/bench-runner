@@ -6,6 +6,7 @@ declare -A STAGES=( [build]=true [profile]=true [time]=true [trace]=true )
 declare TARGET=true # we run all targets
 declare MOUNT=false
 declare VERBOSITY=0
+readonly USCRIPT="$0"
 
 usage() {
     cat <<- HERE >&2
