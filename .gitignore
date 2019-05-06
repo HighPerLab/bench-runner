@@ -10,3 +10,6 @@
 
 # slurm files
 slurm-*.out
+
+# test related
+results/

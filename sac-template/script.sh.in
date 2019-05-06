@@ -122,39 +122,42 @@ inf "Max number of threads for multi-threaded run is ${MAXTHREADS}"
 
 STAGE="BUILD"
 
-if [ "x${MODE}" = "xMANUAL" ]; then
-    for source in "${SOURCES[@]}"; do
-        cp -r "${LOCALDIR}/${source}" "${WORKDIR}/"
-    done
+# shellcheck disable=SC2153
+if [[ "${STAGES[build]}" == true ]]; then
+    if [ "x${MODE}" = "xMANUAL" ]; then
+        for source in "${SOURCES[@]}"; do
+            cp -r "${LOCALDIR}/${source}" "${WORKDIR}/"
+        done
 
-    # call build function
-    capture build
-else
-    for source in "${SOURCES[@]}"; do
-        count=0
-        for target in "${TARGETS[@]}"; do
-            for varient in "${VARIENTS[@]}"; do
-                read -r -a buildflags <<< "$(eval echo "\${BUILDFLAGS_${varient}[${count}]}")"
-                binary_name="${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out"
-                build_log="${WORKDIR}/sac2c-build-${target}-${varient}.log"
+        # call build function
+        capture build
+    else
+        for source in "${SOURCES[@]}"; do
+            count=0
+            for target in "${TARGETS[@]}"; do
+                for varient in "${VARIENTS[@]}"; do
+                    read -r -a buildflags <<< "$(eval echo "\${BUILDFLAGS_${varient}[${count}]}")"
+                    binary_name="${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out"
+                    build_log="${WORKDIR}/sac2c-build-${target}-${varient}.log"
 
-                if [[ ! "${target}" =~ "mt" ]]; then
-                    btype='p'
-                    inf "compiling Profiling-Version target '$target' variant '$varient' with \`${buildflags[*]}'"
-                    if ! $COMPILER "${buildflags[@]}" -profile m -t "${target}" -o "profile-${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
+                    if [[ ! "${target}" =~ "mt" ]]; then
+                        btype='p'
+                        inf "compiling Profiling-Version target '$target' variant '$varient' with \`${buildflags[*]}'"
+                        if ! $COMPILER "${buildflags[@]}" -profile m -t "${target}" -o "profile-${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
+                            error_handling
+                        fi
+                    fi
+                    btype='t'
+                    inf "compiling Timing-Version target '$target' variant '$varient' with \`${buildflags[*]}'"
+                    if ! $COMPILER "${buildflags[@]}" -t "${target}" -o "${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
                         error_handling
                     fi
-                fi
-                btype='t'
-                inf "compiling Timing-Version target '$target' variant '$varient' with \`${buildflags[*]}'"
-                if ! $COMPILER "${buildflags[@]}" -t "${target}" -o "${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
-                    error_handling
-                fi
-                unset btype
+                    unset btype
+                done
+                (( count += 1 ))
             done
-            (( count += 1 ))
         done
-    done
+    fi
 fi
 
 # we should unset the counter from before
@@ -176,8 +179,10 @@ fi
 STAGE="RUN"
 
 if [ "x${MODE}" = "xMANUAL" ]; then
-    # call run function
-    capture run
+    if [[ "${STAGES[profile]}" == true || "${STAGES[time]}" == true || "${STAGES[trace]}" == true ]]; then
+        # call run function
+        capture run
+    fi
 else
     for target in "${TARGETS[@]}"; do
         for varient in "${VARIENTS[@]}"; do
@@ -189,7 +194,7 @@ else
             fi
             binary_log="${WORKDIR}/profile-${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
             # we skip running profiling for MT as its incompatible at the moment
-            if [[ ! "${target}" =~ "mt" ]]; then
+            if [[ "${STAGES[profile]}" == true && ! "${target}" =~ "mt" ]]; then
                 if [ ${SKIP[${target}-${varient}-p]-0} -gt 0 ]; then
                     inf "SKIPPING profiling target '$target' and variant '$varient'"
                 else
@@ -206,31 +211,34 @@ else
             if [ ${SKIP[${target}-${varient}-t]-0} -gt 0 ]; then
                 inf "SKIPPING timing target '$target' and variant '$varient'"
             else
-                inf "TIMING target '$target' with variant '$varient'"
-                inf "Doing ${MAXREP} repetitions of this run"
-                binary_log="${WORKDIR}/${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
-                for ((count=1; count <= MAXREP; count++)); do
-                    inf "REPETITION: ${count}/${MAXREP}"
-                    __log_noredirect 4 "INFO" "REPETITION: ${count}/${MAXREP}" >> "${binary_log}"
-                    if [[ "${target}" =~ "mt" ]]; then
-                        for ((thread = 1; thread <= MAXTHREADS; thread+=1)); do
-                            # we only want even numbers, and one: 1 2 4 6 8 ...
-                            if [ "x${thread}" = "x1" ] || [ "$(( thread % 2 ))" = "0" ]; then
-                                inf "  MT MODE: ${thread}/${MAXTHREADS} threads"
-                                __log_noredirect 4 "INFO" "  MT MODE: ${thread}/${MAXTHREADS} threads" >> "${binary_log}"
-                                export SAC_PARALLEL=${thread}
-                                # shellcheck disable=SC2153
-                                timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
-                                unset SAC_PARALLEL
-                            fi
-                        done
-                    else # sequentional targets
-                        timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
-                    fi
-                done
 
-                if [[ "${target}" =~ "cuda" ]]; then
-                    inf "TIMING GPU target '$target' with variant '$varient'"
+                if [[ "${STAGES[time]}" == true ]]; then
+                    inf "TIMING target '$target' with variant '$varient'"
+                    inf "Doing ${MAXREP} repetitions of this run"
+                    binary_log="${WORKDIR}/${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.log"
+                    for ((count=1; count <= MAXREP; count++)); do
+                        inf "REPETITION: ${count}/${MAXREP}"
+                        __log_noredirect 4 "INFO" "REPETITION: ${count}/${MAXREP}" >> "${binary_log}"
+                        if [[ "${target}" =~ "mt" ]]; then
+                            for ((thread = 1; thread <= MAXTHREADS; thread+=1)); do
+                                # we only want even numbers, and one: 1 2 4 6 8 ...
+                                if [ "x${thread}" = "x1" ] || [ "$(( thread % 2 ))" = "0" ]; then
+                                    inf "  MT MODE: ${thread}/${MAXTHREADS} threads"
+                                    __log_noredirect 4 "INFO" "  MT MODE: ${thread}/${MAXTHREADS} threads" >> "${binary_log}"
+                                    export SAC_PARALLEL=${thread}
+                                    # shellcheck disable=SC2153
+                                    timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
+                                    unset SAC_PARALLEL
+                                fi
+                            done
+                        else # sequentional targets
+                            timeit "${binary_name}" "${RUNFLAGS}" "${binary_log}" "${STDINS}"
+                        fi
+                    done
+                fi
+
+                if [[ "${STAGES[trace]}" == true && "${target}" =~ "cuda" ]]; then
+                    inf "PROFILING GPU target '$target' with variant '$varient'"
                     # we need to clear out the nvprof dir as it can get really full...
                     debug "Clearing the NVPROF tmp directory"
                     [ -d '/tmp/.nvprof' ] && rm -rf '/tmp/.nvprof'
