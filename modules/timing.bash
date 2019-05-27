@@ -25,7 +25,9 @@ timeit_cuda() {
     inf "Running with NVPROF"
     debug "RUN: ./${1} ${runflags[*]} < ${stdin} &> /dev/null"
     __log_noredirect 4 "INFO" "  CUDA profiler output:" >> "${3}"
-    if ! nvprof -f --profile-api-trace all --track-memory-allocations on --unified-memory-profiling per-process-device -u ms --csv --log-file "${3}" ./"${1}" "${runflags[@]}" < "${stdin}" &> /dev/null; then
+    # WTF log-file does not work sometimes?!
+    #if ! nvprof -f --profile-api-trace all --track-memory-allocations on --unified-memory-profiling per-process-device -u ms --csv --log-file "${3}" ./"${1}" "${runflags[@]}" < "${stdin}" &> /dev/null; then
+    if ! nvprof -f --profile-api-trace all --track-memory-allocations on --unified-memory-profiling per-process-device -u ms --csv ./"${1}" "${runflags[@]}" < "${stdin}" &> "${3}"; then
         error_handling
     fi
 }
@@ -40,7 +42,9 @@ nvprof_trace() {
     local stdin="${4:-/dev/null}"
     inf "Running with NVPROF GPU trace"
     __log_noredirect 4 "INFO" "  CUDA trace output:" >> "${3}"
-    if ! nvprof -f --print-gpu-trace -u ms --csv --log-file "${3}" ./"${1}" "${runflags[@]}" < "${stdin}" &> /dev/null; then
+    # WTF log-file does not work sometimes?!
+    #if ! nvprof -f --print-gpu-trace -u ms --csv --log-file "${3}" ./"${1}" "${runflags[@]}" < "${stdin}" &> /dev/null; then
+    if ! nvprof -f --print-gpu-trace -u ms --csv ./"${1}" "${runflags[@]}" < "${stdin}" &> "${3}"; then
         error_handling
     fi
 
