@@ -7,6 +7,7 @@ if [ "$MOUNT" = true ]; then
     mounttmp
 fi
 
+export TMPDIR=/dev/shm
 WORKDIR="$(mktemp -d)"
 LOGFILE="${WORKDIR}/output.log"
 
@@ -40,7 +41,7 @@ saveit()
     # copy current script over as well (must happen before pushd)
     cp "$(readlink -f "$USCRIPT")" "${WORKDIR}/"
 
-    pushd "/tmp" || exit 10
+    pushd "$TMPDIR" || exit 10
 
     # we don't always copy over the sources, so we need to make sure we do this
     # eventually.
@@ -64,11 +65,11 @@ finish()
 {
     # clear dir stack
     dirs -c
-    # and move away from /tmp
+    # and move away from $TMPDIR
     cd / || exit 10
 
     inf "Removing NVPROF tmp dir, if it exists"
-    test -d /tmp/.nvprof && rm -rf /tmp/.nvprof
+    test -d "$TMPDIR/.nvprof" && rm -rf "$TMPDIR/.nvprof"
 
     inf "Deleting workdir..."
     rm -rf "${WORKDIR}"
@@ -142,17 +143,28 @@ if [[ "${STAGES[build]}" == true ]]; then
                     read -r -a buildflags <<< "$(eval echo "\${BUILDFLAGS_${varient}[${count}]}")"
                     binary_name="${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out"
                     build_log="${WORKDIR}/sac2c-build-${target}-${varient}.log"
+                    # extra flags, reset on each iteration
+                    xflags=""
+
+                    if [[ "${target}" =~ "cuda" ]]; then
+                        # titan xp
+                        xflags="-mt_bind simple -cuda_arch sm61"
+                        # V100
+                        #xflags="-mt_bind simple -cuda_arch sm70"
+                        # k20
+                        #xflags="-mt_bind simple -cuda_arch sm35"
+                    fi
 
                     if [[ ! "${target}" =~ "mt" ]]; then
                         btype='p'
                         inf "compiling Profiling-Version target '$target' variant '$varient' with \`${buildflags[*]}'"
-                        if ! $COMPILER "${buildflags[@]}" -profile m -t "${target}" -o "profile-${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
+                        if ! $COMPILER "${buildflags[@]}" ${xflags} -profile m -t "${target}" -o "profile-${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
                             error_handling
                         fi
                     fi
                     btype='t'
                     inf "compiling Timing-Version target '$target' variant '$varient' with \`${buildflags[*]}'"
-                    if ! $COMPILER "${buildflags[@]}" -t "${target}" -o "${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
+                    if ! $COMPILER "${buildflags[@]}" ${xflags} -t "${target}" -o "${binary_name}" "${LOCALDIR}/${source}" &>> "${build_log}"; then
                         error_handling
                     fi
                     unset btype
@@ -244,7 +256,7 @@ else
                     inf "PROFILING GPU target '$target' with variant '$varient'"
                     # we need to clear out the nvprof dir as it can get really full...
                     debug "Clearing the NVPROF tmp directory"
-                    [ -d '/tmp/.nvprof' ] && rm -rf '/tmp/.nvprof'
+                    test -d "$TMPDIR/.nvprof" && rm -rf "$TMPDIR/.nvprof"
                     cuda_log="${WORKDIR}/profile-nvprof-${target}-${varient}.csv.log"
                     timeit_cuda "${binary_name}" "${RUNFLAGS}" "${cuda_log}" "${STDINS}"
                     if [[ ! "${target}" =~ "_man" ]]; then
