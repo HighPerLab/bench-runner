@@ -148,11 +148,11 @@ if [[ "${STAGES[build]}" == true ]]; then
 
                     if [[ "${target}" =~ "cuda" ]]; then
                         # titan xp
-                        xflags="-mt_bind simple -cuda_arch sm61"
+                        #xflags="-mt_bind simple -cuda_arch sm61"
                         # V100
                         #xflags="-mt_bind simple -cuda_arch sm70"
                         # k20
-                        #xflags="-mt_bind simple -cuda_arch sm35"
+                        xflags="-mt_bind simple -cuda_arch sm35"
                     fi
 
                     if [[ ! "${target}" =~ "mt" ]]; then
