@@ -50,7 +50,8 @@ Documentation
 -------------
 
 Documentation of some of the scripts (and their internals) can be found
-under the `doc/` directory.
+under the `doc/` directory. This is written in [scdoc][5] format, and so
+can be generated into manpages if desired.
 
 External Resources
 ------------------
@@ -85,5 +86,6 @@ Ideas
 
 [1]: https://www.macs.hw.ac.uk/gitlab/hans/benchmark-profiles
 [3]: https://www.sac-home.org/
+[5]: https://git.sr.ht/~sircmpwn/scdoc
 [10]: https://github.com/smxi/inxi
 [11]: http://modules.sourceforge.net/

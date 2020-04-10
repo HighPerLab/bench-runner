@@ -1,0 +1,49 @@
+generate(1) "v. 0.6.0"
+
+# NAME
+
+generate - generate a SLURM-compatible script from a bench-runner profile
+
+# SYNOPSIS
+
+generate [*-h*|*-f*|*-v*] [*-b* _bsys_] [*-r* _dir_] [*-t* _dir_]
+\[*-T* _target_] [*-V* _variant_] [*-d* _dir_]
+
+# DESCRIPTION
+
+A bench-runner profile encodes basic data on how to compile and run a given
+piece of source code. The general formatting of a profile can be found in
+the specific documentation file.
+
+*generate* reads the profile, and given a template, generates a script that
+can be run through SLURM.
+
+# OPTIONS
+
+*-h*			print usage message and exit
+
+*-b* _bsys_		batch system to generate for (default: _slurm_, choices: _slurm_
+, _pbs_)
+
+*-d* _dir_		specify directory where to read bench-runner profile files from,
+otherwise look in current working directory
+
+*-f*			force; overwrite existing scripts
+
+*-i*			display system info and exit
+
+*-r* _dir_		root directory (where bench-runner files are)
+
+*-t* _dir_		directory with template input files to build sbatch script
+
+*-T* _target_		specify which targets to encode (overrides profile); can be
+given multiple times
+
+*-v*			increase verbosity (can be given multiple times)
+
+*-V* _variant_	specify which variants to encode (overrides profile); can be
+given multiple times
+
+# AUTHOR
+
+Hans-Nikolai Viessmann <hans AT viess.mn>

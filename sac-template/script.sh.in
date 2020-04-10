@@ -139,6 +139,12 @@ if [[ "${STAGES[build]}" == true ]]; then
         for source in "${SOURCES[@]}"; do
             count=0
             for target in "${TARGETS[@]}"; do
+                if [ -n "${TARGET}" ] && [ "x${TARGET}" != "x${target}" ]; then
+                    inf "Skipping build of target '$target', looking for '$TARGET'"
+                    # we need to keep incrementing the target count
+                    (( count += 1 ))
+                    continue
+                fi
                 for varient in "${VARIENTS[@]}"; do
                     read -r -a buildflags <<< "$(eval echo "\${BUILDFLAGS_${varient}[${count}]}")"
                     binary_name="${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out"
@@ -200,6 +206,10 @@ if [ "x${MODE}" = "xMANUAL" ]; then
     fi
 else
     for target in "${TARGETS[@]}"; do
+        if [ -n "${TARGET}" ] && [ "x${TARGET}" != "x${target}" ]; then
+            inf "Skipping run of target '$target', looking for '$TARGET'"
+            continue
+        fi
         for varient in "${VARIENTS[@]}"; do
             binary_name="${BENCHSUITE}-${BENCHNAME}-${target}-${varient}.out"
             if [ ! -e "${binary_name}" ]; then

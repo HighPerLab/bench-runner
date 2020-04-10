@@ -34,6 +34,7 @@ VERBOSITY=0
 DOSYSINFO=false
 readonly _batchtypes=('slurm' 'pbs')
 BATCHSYS=${_batchtypes[0]}
+readonly VERSION='0.6.0'
 
 while getopts "vhfib:d:V:r:t:T:" flag; do
     case $flag in
@@ -76,6 +77,7 @@ while getopts "vhfib:d:V:r:t:T:" flag; do
             ;&
         ?)
             echo "Usage: $0 [-h|-f|-v...] [-b bsys] [-r dir] [-t dir] [-T target] [-V variant] [-d dir]" >&2
+            echo "version: ${VERSION}" >&2
             echo "" >&2
             echo "Generate batch system compatible scripts based upon profile files and a script template" >&2
             echo "" >&2
@@ -284,4 +286,5 @@ for profile in "${PROFILES[@]}"; do
     unset buildflags
 done
 
+# delete temp file
 [ -f "${BMODF}" ] && rm "${BMODF}"

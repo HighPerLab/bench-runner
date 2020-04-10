@@ -3,9 +3,10 @@
 #
 
 declare -A STAGES=( [build]=true [profile]=true [time]=true [trace]=true )
-declare TARGET=true # we run all targets
+declare TARGET= # we run all targets
 declare MOUNT=false
 declare VERBOSITY=0
+# shellcheck disable=SC2034
 readonly USCRIPT="$0"
 
 usage() {
@@ -59,7 +60,9 @@ argparse() {
     done
 
     readonly STAGES
+# shellcheck disable=SC2034
     readonly TARGET
+# shellcheck disable=SC2034
     readonly MOUNT
     readonly VERBOSITY
 }
