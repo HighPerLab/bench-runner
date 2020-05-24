@@ -112,8 +112,8 @@ pushd "${WORKDIR}" || exit 10
 # GET SYSTEM INFO
 
 STAGE='INFO'
-inf "Running \`${BENCHNAME}' from \`${BENCHSUITE}'"
-inf "Gathering system Information"
+notify "Running \`${BENCHNAME}' from \`${BENCHSUITE}'"
+notify "Gathering system Information"
 sysinfo
 
 # RUN SPECIFICATIONs
