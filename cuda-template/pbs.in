@@ -1,0 +1,10 @@
+# on isambard and cirrus we use the following
+#-q gpu
+#-l select=1:ncpus=2:ngpus=1
+# on HPC zoo we use the following
+#PBS -q workq
+#PBS -l select=1:ngpus=1:gputype=gtx1080ti
+#PBS -N @NAME@
+#PBS -l place=excl
+#PBS -l walltime=@TIMELIMIT@
+#PBS -M hans@viess.mn

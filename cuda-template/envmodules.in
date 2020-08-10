@@ -1,0 +1,4 @@
+module purge
+module load gcc/10.1.0
+module load cuda/10.1
+module load hwloc/2.0.4

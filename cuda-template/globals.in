@@ -1,0 +1,3 @@
+declare -A SKIP
+STAGE="NULL"
+readonly LOCALDIR="@PWD@"

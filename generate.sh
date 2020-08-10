@@ -137,17 +137,16 @@ fi
 PROFILES=( "${PROFDIR}"/*.profile )
 
 # FIXME again we ignore generics for the moment
-COMPILER=$(command -v sac2c_p) || critical "Unable to locate sac2c_p binary, exiting..."
+#COMPILER=$(command -v sac2c_p) || critical "Unable to locate sac2c_p binary, exiting..."
 
 if [ ${#PROFILES[@]} -eq 0 ]; then
     critical "No profiles found! Exiting..."
     exit 1
 fi
 
-
 # we compile the bash modules into a single file
 BMODF="$(mktemp)"
-cat ${RDIR}/modules/*.bash > "${BMODF}"
+cat "${RDIR}"/modules/*.bash > "${BMODF}"
 
 for profile in "${PROFILES[@]}"; do
     declare -A CURRENTPROFILE
@@ -167,7 +166,7 @@ for profile in "${PROFILES[@]}"; do
     TIMELIMIT="3880"
 
     # get time limit
-    if [ ! -z "${CURRENTPROFILE[TIMELIMIT]}" ]; then
+    if [ -n "${CURRENTPROFILE[TIMELIMIT]}" ]; then
         TIMELIMIT="${CURRENTPROFILE[TIMELIMIT]//\'}"
     fi
 
@@ -182,16 +181,16 @@ for profile in "${PROFILES[@]}"; do
     # check that we have the compiler set
     if [ -z "${CURRENTPROFILE[COMPILER]}" ]; then
         # we'll go back to generics later
-        #error "Can't generate script without \`COMPILER' being defined. Skipping '${SCRIPT_NAME}'"
-        #skip=true
-        CURRENTPROFILE[COMPILER]="'${COMPILER}'"
+        error "Can't generate script without \`COMPILER' being defined. Skipping '${SCRIPT_NAME}'"
+        skip=true
+        #CURRENTPROFILE[COMPILER]="'${COMPILER}'"
     fi
 
     # check that we have build for MANUAL mode
     if [ -z "${CURRENTPROFILE[BUILD]}" ] && [ "$BUILD_MANUAL" = true ]; then
         error "Can't generate script with manual build without \`BUILD' function. Skipping '${SCRIPT_NAME}'"
         skip=true
-    elif [ ! -z "${CURRENTPROFILE[BUILD]}" ] && [ "$BUILD_MANUAL" = false ]; then
+    elif [ -n "${CURRENTPROFILE[BUILD]}" ] && [ "$BUILD_MANUAL" = false ]; then
         warn "Profile specifies BUILD but is in AUTO mode!"
         unset 'CURRENTPROFILE[BUILD]'
     fi
@@ -200,7 +199,7 @@ for profile in "${PROFILES[@]}"; do
     if [ -z "${CURRENTPROFILE[RUN]}" ] && [ "$BUILD_MANUAL" = true ]; then
         error "Can't generate script with manual build without \`RUN' function. Skipping '${SCRIPT_NAME}'"
         skip=true
-    elif [ ! -z "${CURRENTPROFILE[RUN]}" ] && [ "$BUILD_MANUAL" = false ]; then
+    elif [ -n "${CURRENTPROFILE[RUN]}" ] && [ "$BUILD_MANUAL" = false ]; then
         warn "Profile specifies RUN but is in AUTO mode!"
         unset 'CURRENTPROFILE[RUN]'
     fi
@@ -268,7 +267,7 @@ for profile in "${PROFILES[@]}"; do
         if [ ! -f "${SCRIPT_NAME}" ] || [ "${FORCE}" = true ]; then
             sed -e "/## BATCH/ r ${RDIR}/${TDIR}/${BATCHSYS}.in" -e "/## ENVMODULES/ r ${RDIR}/${TDIR}/envmodules.in" \
                 -e "/## GLOBALS/ r ${RDIR}/${TDIR}/globals.in" -e "/## BASHMODULES/ r ${BMODF}" \
-                -e "/## SCRIPT/ r ${RDIR}/${TDIR}/script.sh.in" ${RDIR}/basic-template.sh.in |\
+                -e "/## SCRIPT/ r ${RDIR}/${TDIR}/script.sh.in" "${RDIR}/basic-template.sh.in" |\
             sed -e "s:@NAME@:${FULL_NAME}:" -e "s:@TIMELIMIT@:${TIMELIMIT}:" \
                 -e "s:@PROFILE@:${PROFILEOUT}:" -e "s:@RUNNERDIR@:${RDIR}:" -e "s:@PWD@:${PWD}:" > "${SCRIPT_NAME}"
             chmod +x -- "${SCRIPT_NAME}"
