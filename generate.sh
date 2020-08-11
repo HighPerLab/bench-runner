@@ -8,16 +8,19 @@
 # Format:
 # - BENCHSUITE = ''
 # - BENCHNAME = ''
-# - MODE=AUTO          optional, choices: AUTO, MANUAL; default is AUTO
+# - MODE=AUTO          optional, choices: AUTO, MANUAL, MAKE; default is AUTO
 # - COMPILER=''        set teh compiler to be used
 # - TIMELIMIT=MINUTES  optional, defaults to 60 minutes
-# - SOURCES = ()
+# - SOURCES = ()       note, in the case of MAKE, the first source is assumend to be
+#                      a directory containing the Makefile. Any further list directories
+#                      are only copied over, not traversed!
 # - INPUTS = ()        optional, if give all data is copied to temp
 # - TARGETS = ()       optional, defaults to TARGETS = ('seq')
 # - VARIENTS = ()      optional, defaults to VARIENTS = ('default')
 # - BUILDFLAGS = ()    is converted to BUILDFLAGS_default
 #     or BUILDFLAGS_varient = ()
 # - RUNFLAGS = ''      optional
+# - REPRANGE = ()      optional, contains a start, end, and increment value (think seq)
 # - STDINS = ''        optional
 
 shopt -s nullglob
@@ -34,7 +37,7 @@ VERBOSITY=0
 DOSYSINFO=false
 readonly _batchtypes=('slurm' 'pbs')
 BATCHSYS=${_batchtypes[0]}
-readonly VERSION='0.6.0'
+readonly VERSION='0.7.0'
 
 while getopts "vhfib:d:V:r:t:T:" flag; do
     case $flag in
@@ -159,6 +162,7 @@ for profile in "${PROFILES[@]}"; do
     # escape (\#) hash symbol and ampersand)
 
     BUILD_MANUAL=false
+    BUILD_MAKE=false
     skip=false
     FULL_NAME="${CURRENTPROFILE[BENCHSUITE]//\'}-${CURRENTPROFILE[BENCHNAME]//\'}"
     SCRIPT_NAME="${FULL_NAME}.run.sh"
@@ -174,6 +178,10 @@ for profile in "${PROFILES[@]}"; do
     if [ "x${CURRENTPROFILE[MODE]//\'}" = "xMANUAL" ]; then
         BUILD_MANUAL=true
         CURRENTPROFILE[MODE]="'MANUAL'"
+    elif [ "x${CURRENTPROFILE[MODE]//\'}" = "xMAKE" ]; then
+        BUILD_MAKE=true
+        CURRENTPROFILE[MODE]="'MAKE'"
+        CURRENTPROFILE[COMPILER]="'make'"
     else
         CURRENTPROFILE[MODE]="'AUTO'"
     fi
@@ -202,6 +210,11 @@ for profile in "${PROFILES[@]}"; do
     elif [ -n "${CURRENTPROFILE[RUN]}" ] && [ "$BUILD_MANUAL" = false ]; then
         warn "Profile specifies RUN but is in AUTO mode!"
         unset 'CURRENTPROFILE[RUN]'
+    fi
+
+    # check that we have REPRANGE to define the range, default is 5 iterations
+    if [ -z "${CURRENTPROFILE[REPRANGE]}" ]; then
+        CURRENTPROFILE[REPRANGE]="('1' '5' '1')"
     fi
 
     if [ "$skip" = false ]; then
